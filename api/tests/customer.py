@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
-from api import app
 
+from api import app
 from api.dependency.state import get_state
 from api.models.customer import Customer
 from api.tests import override_get_state
@@ -26,7 +26,7 @@ class TestCustomer:
         override_get_state().session.flush()
         override_get_state().session.close()
 
-    def test_register_customer(self):
+    def test_customer_register(self):
         try:
             response = self.__test_client.post(
                 "/customer/register",
@@ -76,7 +76,7 @@ class TestCustomer:
         finally:
             override_get_state().session.query(Customer).delete()
 
-    def test_login_customer(self):
+    def test_customer_login(self):
         try:
             register_response = self.__test_client.post(
                 "/customer/register",
@@ -119,6 +119,42 @@ class TestCustomer:
                 "/customer/login",
                 json={"username": "wrongusername", "password": "mypassword"},
             )
+
+        finally:
+            override_get_state().session.query(Customer).delete()
+
+    def test_customer_get(self):
+        try:
+
+            register_response = self.__test_client.post(
+                "/customer/register",
+                json={
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "username": "johndoe",
+                    "email": "test@gmail.com",
+                    "password": "mypassword",
+                },
+            )
+
+            assert register_response.status_code == 200
+
+            registered_id = self.__decode_jwt(
+                register_response.json()["jwt_token"]
+            )
+
+            get_response =  self.__test_client.get("/customer/", headers={
+                "Authorization": f"Bearer {register_response.json()["jwt_token"]}"
+            })
+
+            assert get_response.status_code == 200
+            assert registered_id == get_response.json()["id"]
+
+            failed_response = self.__test_client.get("/customer/", headers={
+                "Authorization": "Bearer Invalid"
+            })
+
+            assert failed_response.status_code == 401
 
         finally:
             override_get_state().session.query(Customer).delete()

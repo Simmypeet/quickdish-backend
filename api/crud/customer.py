@@ -92,3 +92,9 @@ async def customer_login(
     )
 
     return AuthenticationResponse(jwt_token=token)
+
+
+async def get_customer(state: State, customer_id: int) -> Customer | None:
+    """Get a customer by their ID."""
+    return state.session.query(Customer).filter(Customer.id == customer_id).first()
+

@@ -2,8 +2,6 @@ from pydantic import BaseModel
 
 
 class CustomerBase(BaseModel):
-    """The base schema for customer data."""
-
     first_name: str
     last_name: str
     username: str
@@ -11,14 +9,10 @@ class CustomerBase(BaseModel):
 
 
 class CutomerRegister(CustomerBase):
-    """The schema used to register a new customer."""
-
     password: str
 
 
 class CustomerLogin(BaseModel):
-    """The schema used to login a customer."""
-
     username: str
     password: str
 
@@ -50,12 +44,8 @@ class AuthenticationResponse(BaseModel):
 
 
 class ConflictingCustomerError(BaseModel):
-    """The error schema for the customer registration endpoint."""
-
     error: str = "an account with the same username or email already exists"
 
 
 class AuthenticationError(BaseModel):
-    """The error schema for the customer authentication endpoints."""
-
     error: str
