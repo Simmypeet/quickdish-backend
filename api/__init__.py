@@ -1,7 +1,7 @@
 from fastapi import Depends, FastAPI, Response
 from fastapi.security import HTTPBearer
 
-from api.dependency.customer import get_customer_id
+from api.dependency.id import get_customer_id
 from api.dependency.state import get_state
 from api.schemas.authentication import (
     AuthenticationError,
