@@ -31,21 +31,5 @@ class Customer(CustomerBase):
         from_attributes = True
 
 
-class AuthenticationResponse(BaseModel):
-    """
-    The response schema for authentication endpoints.
-
-    The `jwt_token` is used to authenticate the customer in future requests.
-    """
-
-    jwt_token: str
-    """The JWT token for the newly created customer. This token is used to 
-    authenticate the customer in future requests."""
-
-
 class ConflictingCustomerError(BaseModel):
     error: str = "an account with the same username or email already exists"
-
-
-class AuthenticationError(BaseModel):
-    error: str

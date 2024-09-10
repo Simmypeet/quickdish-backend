@@ -1,8 +1,10 @@
 from api.state import State
 from api.models.customer import Customer
-from api.schemas.customer import (
-    AuthenticationError,
+from api.schemas.authentication import (
     AuthenticationResponse,
+    AuthenticationError,
+)
+from api.schemas.customer import (
     ConflictingCustomerError,
     CustomerLogin,
     CutomerRegister,

@@ -3,9 +3,11 @@ from fastapi.security import HTTPBearer
 
 from api.dependency.customer import get_customer_id
 from api.dependency.state import get_state
-from api.schemas.customer import (
+from api.schemas.authentication import (
     AuthenticationError,
     AuthenticationResponse,
+)
+from api.schemas.customer import (
     ConflictingCustomerError,
     Customer,
     CustomerLogin,
