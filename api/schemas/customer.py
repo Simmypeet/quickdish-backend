@@ -8,7 +8,12 @@ class CustomerBase(BaseModel):
     email: str
 
 
-class CustomerCreate(CustomerBase):
+class CutomerRegister(CustomerBase):
+    password: str
+
+
+class CustomerLogin(BaseModel):
+    username: str
     password: str
 
 
