@@ -1,37 +1,18 @@
-from pydantic import BaseModel
-
 from api.state import State
 from api.models.customer import Customer
-from api.schemas.customer import CustomerLogin, CutomerRegister
+from api.schemas.customer import (
+    AuthenticationError,
+    AuthenticationResponse,
+    ConflictingCustomerError,
+    CustomerLogin,
+    CutomerRegister,
+)
 
 import jwt
 import secrets
 import string
 import hashlib
 import datetime
-
-
-class AuthenticationResponse(BaseModel):
-    """The response model for authentication endpoints.
-
-    The `jwt_token` is used to authenticate the customer in future requests.
-    """
-
-    jwt_token: str
-    """The JWT token for the newly created customer. This token is used to 
-    authenticate the customer in future requests."""
-
-
-class ConflictingCustomerError(BaseModel):
-    """The error model for the customer registration endpoint."""
-
-    error: str = "an account with the same username or email already exists"
-
-
-class AuthenticationError(BaseModel):
-    """The error model for the customer authentication endpoints."""
-
-    error: str
 
 
 async def customer_register(

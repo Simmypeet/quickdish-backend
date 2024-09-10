@@ -1,12 +1,15 @@
 from fastapi import Depends, FastAPI, Response
-from api.schemas.customer import CustomerLogin
 from api.dependency.state import get_state
-from api.state import State
-from api.crud.customer import (
+from api.schemas.customer import (
+    AuthenticationError,
     AuthenticationResponse,
     ConflictingCustomerError,
+    CustomerLogin,
+    Customer,
     CutomerRegister,
-    AuthenticationError,
+)
+from api.state import State
+from api.crud.customer import (
     customer_register,
     customer_login,
 )
