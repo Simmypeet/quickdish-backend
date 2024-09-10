@@ -1,3 +1,4 @@
+from typing import Any
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from api.models import Base
@@ -6,6 +7,11 @@ import alembic.config
 
 import dotenv
 import os
+import datetime
+import jwt
+import string
+import secrets
+import hashlib
 
 
 class State:
@@ -73,3 +79,40 @@ class State:
     def jwt_secret(self) -> str:
         """The secret key used to sign and verify JWT tokens."""
         return self.__jwt_secret
+
+    def encode_jwt(
+        self, payload: dict[str, Any], token_duration: datetime.timedelta
+    ) -> str:
+        """Encode a payload into a JWT token.
+
+        :param payload: The payload to encode.
+        :param token_duration: The duration of the token to be valid.
+        """
+        exp_time = (
+            datetime.datetime.now(datetime.timezone.utc) + token_duration
+        )
+
+        payload["exp"] = exp_time
+
+        return jwt.encode(  # type:ignore
+            payload,
+            self.jwt_secret,
+            algorithm="HS256",
+        )
+
+    def generate_password(self, plain_password: str) -> tuple[str, str]:
+        """Generate a salted and hashed password.
+
+        :param plain_password: The password to hash.
+
+        Returns:
+            A tuple containing the salt and hashed password respectively.
+        """
+
+        characters = string.ascii_letters + string.digits
+        salt = "".join(secrets.choice(characters) for _ in range(16))
+
+        salted_password = plain_password + salt
+        hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
+
+        return salt, hashsed_password

@@ -8,9 +8,6 @@ from api.schemas.customer import (
     CutomerRegister,
 )
 
-import jwt
-import secrets
-import string
 import hashlib
 import datetime
 
@@ -33,18 +30,14 @@ async def customer_register(
     if existing_customer:
         return ConflictingCustomerError()
 
-    characters = string.ascii_letters + string.digits
-    salt = "".join(secrets.choice(characters) for _ in range(16))
-
-    salted_password = customer_create.password + salt
-    hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
+    salt, hashed_password = state.generate_password(customer_create.password)
 
     new_customer = Customer(
         first_name=customer_create.first_name,
         last_name=customer_create.last_name,
         username=customer_create.username,
         email=customer_create.email,
-        hashed_password=hashsed_password,
+        hashed_password=hashed_password,
         salt=salt,
     )
 
@@ -53,12 +46,8 @@ async def customer_register(
 
     state.session.refresh(new_customer)
 
-    exp_time = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=5)
-
-    token = jwt.encode(  # type:ignore
-        {"customer_id": new_customer.id, "exp": exp_time},
-        state.jwt_secret,
-        algorithm="HS256",
+    token = state.encode_jwt(
+        {"customer_id": new_customer.id}, datetime.timedelta(days=5)
     )
 
     return AuthenticationResponse(jwt_token=token)
@@ -83,12 +72,8 @@ async def customer_login(
     if hashsed_password != customer.hashed_password:
         return AuthenticationError(error="username or password is incorrect")
 
-    exp_time = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=5)
-
-    token = jwt.encode(  # type:ignore
-        {"customer_id": customer.id, "exp": exp_time},
-        state.jwt_secret,
-        algorithm="HS256",
+    token = state.encode_jwt(
+        {"customer_id": customer.id}, datetime.timedelta(days=5)
     )
 
     return AuthenticationResponse(jwt_token=token)
@@ -96,5 +81,8 @@ async def customer_login(
 
 async def get_customer(state: State, customer_id: int) -> Customer | None:
     """Get a customer by their ID."""
-    return state.session.query(Customer).filter(Customer.id == customer_id).first()
-
+    return (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
