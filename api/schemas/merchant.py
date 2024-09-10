@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from api.schemas.point import Point
+
 
 class MerchantBase(BaseModel):
     first_name: str
@@ -17,6 +19,21 @@ class MerchantLogin(BaseModel):
     password: str
 
 
+class RestaurantBase(BaseModel):
+    name: str
+    address: str
+    image: str
+    location: Point
+
+
+class Restaurant(RestaurantBase):
+    id: int
+    merchant_id: int
+
+    class Config:
+        from_attributes = True
+
+
 class Merchant(MerchantBase):
     """
     The schema for merchant data. This schema contains all the data of the
@@ -26,6 +43,7 @@ class Merchant(MerchantBase):
     id: int
     hashed_password: str
     salt: str
+    restaurants: list[Restaurant]
 
     class Config:
         from_attributes = True
