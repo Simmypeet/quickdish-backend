@@ -13,4 +13,4 @@ class AuthenticationResponse(BaseModel):
 
 
 class AuthenticationError(BaseModel):
-    error: str
+    error: str = "username or password is incorrect"

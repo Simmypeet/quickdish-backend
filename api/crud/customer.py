@@ -66,13 +66,13 @@ async def customer_login(
     )
 
     if not customer:
-        return AuthenticationError(error="username or password is incorrect")
+        return AuthenticationError()
 
     salted_password = customer_login.password + customer.salt
     hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
 
     if hashsed_password != customer.hashed_password:
-        return AuthenticationError(error="username or password is incorrect")
+        return AuthenticationError()
 
     token = state.encode_jwt(
         {"customer_id": customer.id}, datetime.timedelta(days=5)
