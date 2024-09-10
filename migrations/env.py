@@ -11,14 +11,22 @@ from dotenv import load_dotenv
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 
-load_dotenv()
-database_url = os.getenv("DATABASE_URL")
-
-if not database_url:
-    raise RuntimeError("DATABASE_URL environment variable is not set")
 
 config = context.config
-config.set_main_option("sqlalchemy.url", database_url)
+
+db_path = context.get_x_argument(as_dictionary=True).get("db_path")
+
+# the path is explicitly specified in the argument
+if db_path:
+    config.set_main_option("sqlalchemy.url", db_path)
+else:
+    load_dotenv()
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise RuntimeError("DATABASE_URL environment variable is not set")
+
+    config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

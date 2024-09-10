@@ -9,15 +9,22 @@ from api.crud.customer import (
 
 
 app = FastAPI()
+_state: None | State = None
 
 
 # State dependency
 def get_state():
-    state = State()
+    global _state
+
     try:
-        yield state
+        if _state is None:
+            _state = State()
+
+        yield _state
     finally:
-        state.session.close()
+        if _state is not None:
+            _state.session.flush()
+            _state.session.close()
 
 
 @app.post(

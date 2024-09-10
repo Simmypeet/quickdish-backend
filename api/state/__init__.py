@@ -15,37 +15,54 @@ class State:
     __session: Session
     __jwt_secret: str
 
-    def __init__(self) -> None:
+    def __init__(
+        self, session: Session | None = None, jwt_secret: str | None = None
+    ) -> None:
         """Initialize the state of the FastAPI application.
+
+        :param session: The parameter is for testing pruposes only.
+        :param jwt_secret: The jwt secret key used to sign and verify Pass
+            `None` to use the JWT_SECRET environment variable.
 
         Raises:
             RuntimeError: if the DATABASE_URL or JWT_SECRET environment
                 variables are not set.
         """
-        dotenv.load_dotenv()
+        if session:
+            self.__session = session
+        else:
+            dotenv.load_dotenv()
+            database_url = os.getenv("DATABASE_URL")
 
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            raise RuntimeError("DATABASE_URL environment variable is not set")
+            if not database_url:
+                raise RuntimeError(
+                    "DATABASE_URL environment variable is not set"
+                )
 
-        engine = create_engine(database_url, connect_args={})
+            engine = create_engine(database_url, connect_args={})
 
-        SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=engine
-        )
+            # run migrations
+            alembic.config.main(argv=["upgrade", "head"])  # type:ignore
 
-        self.__session = SessionLocal()
+            SessionLocal = sessionmaker(
+                autocommit=False, autoflush=False, bind=engine
+            )
 
-        jwt_secret = os.getenv("JWT_SECRET")
-        if not jwt_secret:
-            raise RuntimeError("JWT_SECRET environment variable is not set")
+            self.__session = SessionLocal()
+            Base.metadata.create_all(bind=engine)
 
-        self.__jwt_secret = jwt_secret
+        if jwt_secret:
+            self.__jwt_secret = jwt_secret
+        else:
+            dotenv.load_dotenv()
+            jwt_secret = os.getenv("JWT_SECRET")
 
-        Base.metadata.create_all(bind=engine)
+            if not jwt_secret:
+                raise RuntimeError(
+                    "JWT_SECRET environment variable is not set"
+                )
 
-        # run migrations
-        alembic.config.main(argv=["upgrade", "head"])  # type:ignore
+            self.__jwt_secret = jwt_secret
 
     @property
     def session(self) -> Session:

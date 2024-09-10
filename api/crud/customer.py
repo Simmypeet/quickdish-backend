@@ -59,14 +59,13 @@ async def create_customer(
     )
 
     state.session.add(new_customer)
-    state.session.flush()
     state.session.commit()
 
     state.session.refresh(new_customer)
 
     exp_time = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=5)
 
-    token = jwt.encode(
+    token = jwt.encode(  # type:ignore
         {"customer_id": new_customer.id, "exp": exp_time},
         state.jwt_secret,
         algorithm="HS256",
