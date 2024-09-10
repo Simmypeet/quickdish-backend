@@ -1,5 +1,6 @@
 from fastapi import Depends, FastAPI, Response
 from api.schemas.customer import CustomerLogin
+from api.dependency.state import get_state
 from api.state import State
 from api.crud.customer import (
     AuthenticationResponse,
@@ -10,24 +11,7 @@ from api.crud.customer import (
     customer_login,
 )
 
-
 app = FastAPI()
-_state: None | State = None
-
-
-# State dependency
-def get_state():
-    global _state
-
-    try:
-        if _state is None:
-            _state = State()
-
-        yield _state
-    finally:
-        if _state is not None:
-            _state.session.flush()
-            _state.session.close()
 
 
 @app.post(

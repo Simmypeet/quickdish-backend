@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
-from api import app, get_state
+from api import app
 
+from api.dependency.state import get_state
 from api.models.customer import Customer
 from api.tests import override_get_state
 
