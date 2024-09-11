@@ -22,8 +22,11 @@ class MerchantLogin(BaseModel):
 class RestaurantBase(BaseModel):
     name: str
     address: str
-    image: str
     location: Point
+
+
+class RestaurantCreate(RestaurantBase):
+    pass
 
 
 class Restaurant(RestaurantBase):
@@ -43,11 +46,6 @@ class Merchant(MerchantBase):
     id: int
     hashed_password: str
     salt: str
-    restaurants: list[Restaurant]
 
     class Config:
         from_attributes = True
-
-
-class ConflictingMerchantError(BaseModel):
-    error: str = "an account with the same username or email already exists"

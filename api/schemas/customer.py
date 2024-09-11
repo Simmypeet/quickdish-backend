@@ -29,7 +29,3 @@ class Customer(CustomerBase):
 
     class Config:
         from_attributes = True
-
-
-class ConflictingCustomerError(BaseModel):
-    error: str = "an account with the same username or email already exists"

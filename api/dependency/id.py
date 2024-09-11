@@ -4,11 +4,10 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api.dependency.state import get_state
-from api.schemas.session import (
-    InvalidHeaderSchemeError,
+from api.errors.session import (
     ExpiredSessionError,
+    InvalidHeaderSchemeError,
     InvalidSessionTokenError,
-    SessionError,
 )
 from api.state import State
 
@@ -35,9 +34,9 @@ class GetID:
             HTTPAuthorizationCredentials, Depends(HTTPBearer())
         ],
         state: Annotated[State, Depends(get_state)],
-    ) -> int | SessionError:
+    ) -> int:
         if credentials.scheme != "Bearer":
-            return InvalidHeaderSchemeError()
+            raise InvalidHeaderSchemeError()
 
         try:
             return jwt.decode(  # type:ignore
@@ -47,13 +46,13 @@ class GetID:
             )[self.__id_name]
 
         except jwt.ExpiredSignatureError:
-            return ExpiredSessionError()
+            raise ExpiredSessionError()
 
         except jwt.InvalidTokenError:
-            return InvalidSessionTokenError()
+            raise InvalidSessionTokenError()
 
         except KeyError:
-            return InvalidSessionTokenError()
+            raise InvalidSessionTokenError()
 
 
 get_customer_id = GetID("customer_id")

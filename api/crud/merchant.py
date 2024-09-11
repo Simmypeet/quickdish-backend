@@ -1,13 +1,13 @@
+import os
+from api.errors import ConflictingError, NotFoundError
+from api.errors.authentication import AuthenticationError
+from api.schemas.authentication import AuthenticationResponse
 from api.state import State
-from api.models.merchant import Merchant
-from api.schemas.authentication import (
-    AuthenticationResponse,
-    AuthenticationError,
-)
+from api.models.merchant import Merchant, Restaurant
 from api.schemas.merchant import (
-    ConflictingMerchantError,
     MerchantLogin,
     MerchantRegister,
+    RestaurantCreate,
 )
 
 import hashlib
@@ -16,7 +16,7 @@ import datetime
 
 async def merchant_register(
     state: State, merchant_register: MerchantRegister
-) -> AuthenticationResponse | ConflictingMerchantError:
+) -> AuthenticationResponse:
     """Create a new merchant in the database."""
 
     # Check if a merchant with the same username or email already exists
@@ -30,7 +30,9 @@ async def merchant_register(
     )
 
     if existing_merchant:
-        return ConflictingMerchantError()
+        raise ConflictingError(
+            "an account with the same username or email already exists"
+        )
 
     salt, hashed_password = state.generate_password(merchant_register.password)
 
@@ -57,7 +59,7 @@ async def merchant_register(
 
 async def merchant_login(
     state: State, merchant_login: MerchantLogin
-) -> AuthenticationResponse | AuthenticationError:
+) -> AuthenticationResponse:
     """Authenticate a merchant and return a JWT token."""
     merchant = (
         state.session.query(Merchant)
@@ -66,13 +68,13 @@ async def merchant_login(
     )
 
     if not merchant:
-        return AuthenticationError()
+        raise AuthenticationError("invalid username or password")
 
     salted_password = merchant_login.password + merchant.salt
     hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
 
     if hashsed_password != merchant.hashed_password:
-        return AuthenticationError()
+        raise AuthenticationError("invalid username or password")
 
     token = state.encode_jwt(
         {"merchant_id": merchant.id}, datetime.timedelta(days=5)
@@ -88,3 +90,41 @@ async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
         .filter(Merchant.id == merchant_id)
         .first()
     )
+
+
+async def create_restaurant(
+    state: State, merchant_id: int, restaurant_create: RestaurantCreate
+) -> int:
+    # Checks if there's a restaurant with the same name
+    existing_restaurant = (
+        state.session.query(Restaurant)
+        .filter(Restaurant.name == restaurant_create.name)
+        .first()
+    )
+
+    if existing_restaurant:
+        raise ConflictingError(
+            "a restaurant with the same name already exists"
+        )
+
+    # Check if the merchant exists
+    merchant = await get_merchant(state, merchant_id)
+    if not merchant:
+        raise NotFoundError("merchant not found")
+
+    default_image = os.getcwd() + "/api/assets/default_restaurant.jpeg"
+
+    new_restaurant = Restaurant(
+        name=restaurant_create.name,
+        address=restaurant_create.address,
+        location=restaurant_create.location,
+        merchant_id=merchant_id,
+        image=default_image,
+    )
+
+    state.session.add(new_restaurant)
+    state.session.commit()
+
+    state.session.refresh(new_restaurant)
+
+    return new_restaurant.id  # type:ignore

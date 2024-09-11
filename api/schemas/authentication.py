@@ -3,14 +3,10 @@ from pydantic import BaseModel
 
 class AuthenticationResponse(BaseModel):
     """
-    The response schema for authentication endpoints.
+    A response model for successful authentication.
 
-    The `jwt_token` is used to authenticate the customer/merchant in future
-    requests.
+    The response contains the JWT token that the client can use to authenticate
+    themselves in the future.
     """
 
     jwt_token: str
-
-
-class AuthenticationError(BaseModel):
-    error: str = "username or password is incorrect"

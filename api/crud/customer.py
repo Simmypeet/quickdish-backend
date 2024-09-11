@@ -1,11 +1,9 @@
+from api.errors import ConflictingError, NotFoundError
+from api.errors.authentication import AuthenticationError
+from api.schemas.authentication import AuthenticationResponse
 from api.state import State
 from api.models.customer import Customer
-from api.schemas.authentication import (
-    AuthenticationResponse,
-    AuthenticationError,
-)
 from api.schemas.customer import (
-    ConflictingCustomerError,
     CustomerLogin,
     CutomerRegister,
 )
@@ -16,7 +14,7 @@ import datetime
 
 async def customer_register(
     state: State, customer_create: CutomerRegister
-) -> AuthenticationResponse | ConflictingCustomerError:
+) -> AuthenticationResponse:
     """Create a new customer in the database."""
 
     # Check if a customer with the same username or email already exists
@@ -30,7 +28,9 @@ async def customer_register(
     )
 
     if existing_customer:
-        return ConflictingCustomerError()
+        raise ConflictingError(
+            "an account with the same username or email already exists"
+        )
 
     salt, hashed_password = state.generate_password(customer_create.password)
 
@@ -57,7 +57,7 @@ async def customer_register(
 
 async def customer_login(
     state: State, customer_login: CustomerLogin
-) -> AuthenticationResponse | AuthenticationError:
+) -> AuthenticationResponse:
     """Authenticate a customer and return a JWT token."""
     customer = (
         state.session.query(Customer)
@@ -66,13 +66,13 @@ async def customer_login(
     )
 
     if not customer:
-        return AuthenticationError()
+        raise AuthenticationError("invalid username or password")
 
     salted_password = customer_login.password + customer.salt
     hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
 
     if hashsed_password != customer.hashed_password:
-        return AuthenticationError()
+        raise AuthenticationError("invalid username or password")
 
     token = state.encode_jwt(
         {"customer_id": customer.id}, datetime.timedelta(days=5)
@@ -81,10 +81,15 @@ async def customer_login(
     return AuthenticationResponse(jwt_token=token)
 
 
-async def get_customer(state: State, customer_id: int) -> Customer | None:
+async def get_customer(state: State, customer_id: int) -> Customer:
     """Get a customer by their ID."""
-    return (
+    result = (
         state.session.query(Customer)
         .filter(Customer.id == customer_id)
         .first()
     )
+
+    if result is None:
+        raise NotFoundError("customer with the ID in the token is not found")
+
+    return result

@@ -69,9 +69,6 @@ class TestCustomer:
             )
 
             assert failed_response.status_code == 409
-            assert failed_response.json() == {
-                "error": "an account with the same username or email already exists"
-            }
 
         finally:
             override_get_state().session.query(Customer).delete()
