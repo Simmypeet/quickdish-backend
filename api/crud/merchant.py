@@ -1,4 +1,3 @@
-import os
 from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError, UnauthorizedError
 from api.schemas.authentication import AuthenticationResponse
@@ -112,14 +111,11 @@ async def create_restaurant(
     if not merchant:
         raise NotFoundError("merchant not found")
 
-    default_image = os.getcwd() + "/api/assets/default_restaurant.jpeg"
-
     new_restaurant = Restaurant(
         name=restaurant_create.name,
         address=restaurant_create.address,
         location=restaurant_create.location,
         merchant_id=merchant_id,
-        image=default_image,
     )
 
     state.session.add(new_restaurant)
