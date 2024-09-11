@@ -1,6 +1,6 @@
 import os
 from api.errors import ConflictingError, NotFoundError
-from api.errors.authentication import AuthenticationError
+from api.errors.authentication import AuthenticationError, UnauthorizedError
 from api.schemas.authentication import AuthenticationResponse
 from api.state import State
 from api.models.merchant import Merchant, Restaurant
@@ -14,7 +14,7 @@ import hashlib
 import datetime
 
 
-async def merchant_register(
+async def register_merchant(
     state: State, merchant_register: MerchantRegister
 ) -> AuthenticationResponse:
     """Create a new merchant in the database."""
@@ -57,7 +57,7 @@ async def merchant_register(
     return AuthenticationResponse(jwt_token=token)
 
 
-async def merchant_login(
+async def login_merchant(
     state: State, merchant_login: MerchantLogin
 ) -> AuthenticationResponse:
     """Authenticate a merchant and return a JWT token."""
@@ -128,3 +128,23 @@ async def create_restaurant(
     state.session.refresh(new_restaurant)
 
     return new_restaurant.id  # type:ignore
+
+
+async def get_restaurant(
+    state: State, restaurant_id: int, merchant_id: int
+) -> Restaurant:
+    """Get a restaurant by its ID."""
+
+    restaurant = (
+        state.session.query(Restaurant)
+        .filter(Restaurant.id == restaurant_id)
+        .first()
+    )
+
+    if not restaurant:
+        raise NotFoundError("restaurant not found")
+
+    if restaurant.merchant_id != merchant_id:  # type:ignore
+        raise UnauthorizedError("merchant does not own this restaurant")
+
+    return restaurant

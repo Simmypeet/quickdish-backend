@@ -12,7 +12,7 @@ import hashlib
 import datetime
 
 
-async def customer_register(
+async def register_customer(
     state: State, customer_create: CutomerRegister
 ) -> AuthenticationResponse:
     """Create a new customer in the database."""
@@ -55,7 +55,7 @@ async def customer_register(
     return AuthenticationResponse(jwt_token=token)
 
 
-async def customer_login(
+async def login_customer(
     state: State, customer_login: CustomerLogin
 ) -> AuthenticationResponse:
     """Authenticate a customer and return a JWT token."""
