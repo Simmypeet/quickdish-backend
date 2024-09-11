@@ -3,155 +3,96 @@ from fastapi.testclient import TestClient
 from api import app
 from api.dependency.state import get_state
 from api.models.customer import Customer
-from api.tests import override_get_state
+
+from api.state import State
 
 import jwt
 
 
-class TestCustomer:
-    __test_client: TestClient
+def test_customer(state_fixture: State):
+    app.dependency_overrides[get_state] = lambda: state_fixture
+    test_client = TestClient(app)
+    register_response = test_client.post(
+        "/customer/register",
+        json={
+            "first_name": "John",
+            "last_name": "Doe",
+            "username": "johndoe",
+            "email": "test@gmail.com",
+            "password": "password",
+        },
+    )
 
-    def __decode_jwt(self, jwt_token: str) -> int:
-        return jwt.decode(  # type:ignore
-            jwt_token, override_get_state().jwt_secret, algorithms=["HS256"]
-        )["customer_id"]
+    assert register_response.status_code == 200
+    decoded_id = jwt.decode(  # type:ignore
+        register_response.json()["jwt_token"],
+        state_fixture.jwt_secret,
+        algorithms=["HS256"],
+    )["customer_id"]
 
-    def setup_class(self):
-        app.dependency_overrides[get_state] = override_get_state
+    result = (
+        state_fixture.session.query(Customer).filter_by(id=decoded_id).first()
+    )
 
-        self.__test_client = TestClient(app)
+    assert result is not None
 
-    def teardown_class(self):
-        app.dependency_overrides = {}
-        override_get_state().session.flush()
-        override_get_state().session.close()
+    assert result.first_name == "John"  # type:ignore
+    assert result.last_name == "Doe"  # type:ignore
+    assert result.username == "johndoe"  # type:ignore
+    assert result.email == "test@gmail.com"  # type:ignore
+    assert result.id == decoded_id  # type:ignore
 
-    def test_customer_register(self):
-        try:
-            response = self.__test_client.post(
-                "/customer/register",
-                json={
-                    "first_name": "John",
-                    "last_name": "Doe",
-                    "username": "johndoe",
-                    "email": "test@gmail.com",
-                    "password": "password",
-                },
-            )
+    failed_get_response = test_client.post(
+        "/customer/register",
+        json={
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "username": "johndoe",
+            "email": "test@gmail.com",
+            "password": "password",
+        },
+    )
 
-            assert response.status_code == 200
-            decoded_id = self.__decode_jwt(response.json()["jwt_token"])
+    assert failed_get_response.status_code == 409
 
-            result = (
-                override_get_state()
-                .session.query(Customer)
-                .filter_by(id=decoded_id)
-                .first()
-            )
+    login_response = test_client.post(
+        "/customer/login",
+        json={"username": "johndoe", "password": "password"},
+    )
 
-            assert result is not None
+    assert login_response.status_code == 200
 
-            assert result.first_name == "John"  # type:ignore
-            assert result.last_name == "Doe"  # type:ignore
-            assert result.username == "johndoe"  # type:ignore
-            assert result.email == "test@gmail.com"  # type:ignore
-            assert result.id == decoded_id  # type:ignore
+    logged_in_id = jwt.decode(  # type:ignore
+        login_response.json()["jwt_token"],
+        state_fixture.jwt_secret,
+        algorithms=["HS256"],
+    )["customer_id"]
 
-            failed_response = self.__test_client.post(
-                "/customer/register",
-                json={
-                    "first_name": "Jane",
-                    "last_name": "Doe",
-                    "username": "johndoe",
-                    "email": "test@gmail.com",
-                    "password": "password",
-                },
-            )
+    assert result.id == logged_in_id
 
-            assert failed_response.status_code == 409
+    failed_login_response = test_client.post(
+        "/customer/login",
+        json={"username": "johndoe", "password": "wrongpassword"},
+    )
 
-        finally:
-            override_get_state().session.query(Customer).delete()
+    assert failed_login_response.status_code == 401
 
-    def test_customer_login(self):
-        try:
-            register_response = self.__test_client.post(
-                "/customer/register",
-                json={
-                    "first_name": "John",
-                    "last_name": "Doe",
-                    "username": "johndoe",
-                    "email": "test@gmail.com",
-                    "password": "mypassword",
-                },
-            )
+    failed_login_response = test_client.post(
+        "/customer/login",
+        json={"username": "wrongusername", "password": "password"},
+    )
 
-            assert register_response.status_code == 200
+    assert failed_login_response.status_code == 401
 
-            registered_id = self.__decode_jwt(
-                register_response.json()["jwt_token"]
-            )
+    get_response =  test_client.get("/customer/", headers={
+        "Authorization": f"Bearer {register_response.json()["jwt_token"]}"
+    })
 
-            login_response = self.__test_client.post(
-                "/customer/login",
-                json={"username": "johndoe", "password": "mypassword"},
-            )
+    assert get_response.status_code == 200
+    assert result.id == get_response.json()["id"]
 
-            assert login_response.status_code == 200
+    failed_get_response = test_client.get("/customer/", headers={
+        "Authorization": "Bearer Invalid"
+    })
 
-            logged_in_id = self.__decode_jwt(
-                login_response.json()["jwt_token"]
-            )
-
-            assert registered_id == logged_in_id
-
-            failed_response = self.__test_client.post(
-                "/customer/login",
-                json={"username": "johndoe", "password": "wrongpassword"},
-            )
-
-            assert failed_response.status_code == 401
-
-            failed_response = self.__test_client.post(
-                "/customer/login",
-                json={"username": "wrongusername", "password": "mypassword"},
-            )
-
-        finally:
-            override_get_state().session.query(Customer).delete()
-
-    def test_customer_get(self):
-        try:
-
-            register_response = self.__test_client.post(
-                "/customer/register",
-                json={
-                    "first_name": "John",
-                    "last_name": "Doe",
-                    "username": "johndoe",
-                    "email": "test@gmail.com",
-                    "password": "mypassword",
-                },
-            )
-
-            assert register_response.status_code == 200
-
-            registered_id = self.__decode_jwt(
-                register_response.json()["jwt_token"]
-            )
-
-            get_response =  self.__test_client.get("/customer/", headers={
-                "Authorization": f"Bearer {register_response.json()["jwt_token"]}"
-            })
-
-            assert get_response.status_code == 200
-            assert registered_id == get_response.json()["id"]
-
-            failed_response = self.__test_client.get("/customer/", headers={
-                "Authorization": "Bearer Invalid"
-            })
-
-            assert failed_response.status_code == 401
-
-        finally:
-            override_get_state().session.query(Customer).delete()
+    assert failed_get_response.status_code == 401
