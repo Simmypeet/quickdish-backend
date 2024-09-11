@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from api.schemas.point import Point
 
@@ -33,8 +33,7 @@ class Restaurant(RestaurantBase):
     id: int
     merchant_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Merchant(MerchantBase):
@@ -47,5 +46,4 @@ class Merchant(MerchantBase):
     hashed_password: str
     salt: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
