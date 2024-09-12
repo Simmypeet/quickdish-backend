@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile
 from fastapi.security import HTTPBearer
 
-from api.crud.restaurant import create_restaurant
+from api.crud.restaurant import create_restaurant, upload_restaurant_image
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
 from api.schemas.restaurant import RestaurantCreate
@@ -42,10 +42,17 @@ async def create_restaurant_api(
     """,
     dependencies=[Depends(HTTPBearer())],
 )
-def upload_restaurant_image_api(
+async def upload_restaurant_image_api(
     restaurant_id: int,
     image: UploadFile,
     state: State = Depends(get_state),
     result: int = Depends(get_merchant_id),
-):
-    pass
+) -> str:
+    await upload_restaurant_image(
+        state,
+        restaurant_id,
+        image,
+        result,
+    )
+
+    return "image uploaded"

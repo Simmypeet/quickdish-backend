@@ -1,4 +1,5 @@
 from typing import Any
+import platformdirs
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from api.models import Base
@@ -20,15 +21,20 @@ class State:
 
     __session: Session
     __jwt_secret: str
+    __application_data_path: str
 
     def __init__(
-        self, session: Session | None = None, jwt_secret: str | None = None
+        self,
+        session: Session | None = None,
+        jwt_secret: str | None = None,
+        application_data_path: str | None = None,
     ) -> None:
         """Initialize the state of the FastAPI application.
 
         :param session: The parameter is for testing pruposes only.
         :param jwt_secret: The jwt secret key used to sign and verify Pass
             `None` to use the JWT_SECRET environment variable.
+        :param application_data_path: The path to the application data folder.
 
         Raises:
             RuntimeError: if the DATABASE_URL or JWT_SECRET environment
@@ -70,6 +76,26 @@ class State:
 
             self.__jwt_secret = jwt_secret
 
+        if application_data_path:
+            self.__application_data_path = application_data_path
+        else:
+            path: str = platformdirs.user_data_dir("quickdish", "quickdish")
+            self.__application_data_path = path
+
+        if not os.path.exists(self.__application_data_path):
+            os.makedirs(self.__application_data_path, exist_ok=True)
+
+            if not os.path.exists(self.__application_data_path):
+                raise RuntimeError(
+                    f"Could not create application data folder at "
+                    f"{self.__application_data_path}"
+                )
+
+        if not os.path.isdir(self.__application_data_path):
+            raise RuntimeError(
+                f"{self.__application_data_path} is not a directory"
+            )
+
     @property
     def session(self) -> Session:
         """The SQLAlchemy session object used to interact with the database."""
@@ -99,6 +125,11 @@ class State:
             self.jwt_secret,
             algorithm="HS256",
         )
+
+    @property
+    def application_data_path(self) -> str:
+        """The path to the application data folder."""
+        return self.__application_data_path
 
     def generate_password(self, plain_password: str) -> tuple[str, str]:
         """Generate a salted and hashed password.
