@@ -5,7 +5,7 @@ from api.state import State
 from api.models.customer import Customer
 from api.schemas.customer import (
     CustomerLogin,
-    CutomerRegister,
+    CustomerRegister,
 )
 
 import hashlib
@@ -13,7 +13,7 @@ import datetime
 
 
 async def register_customer(
-    state: State, customer_create: CutomerRegister
+    state: State, customer_create: CustomerRegister
 ) -> AuthenticationResponse:
     """Create a new customer in the database."""
 
@@ -52,7 +52,9 @@ async def register_customer(
         {"customer_id": new_customer.id}, datetime.timedelta(days=5)
     )
 
-    return AuthenticationResponse(jwt_token=token)
+    return AuthenticationResponse(
+        jwt_token=token, id=new_customer.id  # type: ignore
+    )
 
 
 async def login_customer(
@@ -78,7 +80,9 @@ async def login_customer(
         {"customer_id": customer.id}, datetime.timedelta(days=5)
     )
 
-    return AuthenticationResponse(jwt_token=token)
+    return AuthenticationResponse(
+        jwt_token=token, id=customer.id  # type: ignore
+    )
 
 
 async def get_customer(state: State, customer_id: int) -> Customer:

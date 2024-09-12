@@ -1,12 +1,11 @@
-from api.errors import ConflictingError, NotFoundError
-from api.errors.authentication import AuthenticationError, UnauthorizedError
+from api.errors import ConflictingError
+from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
 from api.state import State
-from api.models.merchant import Merchant, Restaurant
+from api.models.merchant import Merchant
 from api.schemas.merchant import (
     MerchantLogin,
     MerchantRegister,
-    RestaurantCreate,
 )
 
 import hashlib
@@ -53,7 +52,9 @@ async def register_merchant(
         {"merchant_id": new_merchant.id}, datetime.timedelta(days=5)
     )
 
-    return AuthenticationResponse(jwt_token=token)
+    return AuthenticationResponse(
+        jwt_token=token, id=new_merchant.id  # type:ignore
+    )
 
 
 async def login_merchant(
@@ -79,7 +80,9 @@ async def login_merchant(
         {"merchant_id": merchant.id}, datetime.timedelta(days=5)
     )
 
-    return AuthenticationResponse(jwt_token=token)
+    return AuthenticationResponse(
+        jwt_token=token, id=merchant.id  # type:ignore
+    )
 
 
 async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
@@ -89,58 +92,3 @@ async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
         .filter(Merchant.id == merchant_id)
         .first()
     )
-
-
-async def create_restaurant(
-    state: State, merchant_id: int, restaurant_create: RestaurantCreate
-) -> int:
-    # Checks if there's a restaurant with the same name
-    existing_restaurant = (
-        state.session.query(Restaurant)
-        .filter(Restaurant.name == restaurant_create.name)
-        .first()
-    )
-
-    if existing_restaurant:
-        raise ConflictingError(
-            "a restaurant with the same name already exists"
-        )
-
-    # Check if the merchant exists
-    merchant = await get_merchant(state, merchant_id)
-    if not merchant:
-        raise NotFoundError("merchant not found")
-
-    new_restaurant = Restaurant(
-        name=restaurant_create.name,
-        address=restaurant_create.address,
-        location=restaurant_create.location,
-        merchant_id=merchant_id,
-    )
-
-    state.session.add(new_restaurant)
-    state.session.commit()
-
-    state.session.refresh(new_restaurant)
-
-    return new_restaurant.id  # type:ignore
-
-
-async def get_restaurant(
-    state: State, restaurant_id: int, merchant_id: int
-) -> Restaurant:
-    """Get a restaurant by its ID."""
-
-    restaurant = (
-        state.session.query(Restaurant)
-        .filter(Restaurant.id == restaurant_id)
-        .first()
-    )
-
-    if not restaurant:
-        raise NotFoundError("restaurant not found")
-
-    if restaurant.merchant_id != merchant_id:  # type:ignore
-        raise UnauthorizedError("merchant does not own this restaurant")
-
-    return restaurant

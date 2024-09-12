@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from api import app
-from api.dependency.state import get_state
+from api.dependencies.state import get_state
 from api.models.customer import Customer
 
 from api.state import State
@@ -13,7 +13,7 @@ def test_customer(state_fixture: State):
     app.dependency_overrides[get_state] = lambda: state_fixture
     test_client = TestClient(app)
     register_response = test_client.post(
-        "/customer/register",
+        "/customers/register",
         json={
             "first_name": "John",
             "last_name": "Doe",
@@ -29,6 +29,7 @@ def test_customer(state_fixture: State):
         state_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
+    assert decoded_id == register_response.json()["id"]
 
     result = (
         state_fixture.session.query(Customer).filter_by(id=decoded_id).first()
@@ -43,7 +44,7 @@ def test_customer(state_fixture: State):
     assert result.id == decoded_id  # type:ignore
 
     failed_get_response = test_client.post(
-        "/customer/register",
+        "/customers/register",
         json={
             "first_name": "Jane",
             "last_name": "Doe",
@@ -56,7 +57,7 @@ def test_customer(state_fixture: State):
     assert failed_get_response.status_code == 409
 
     login_response = test_client.post(
-        "/customer/login",
+        "/customers/login",
         json={"username": "johndoe", "password": "password"},
     )
 
@@ -71,27 +72,27 @@ def test_customer(state_fixture: State):
     assert result.id == logged_in_id
 
     failed_login_response = test_client.post(
-        "/customer/login",
+        "/customers/login",
         json={"username": "johndoe", "password": "wrongpassword"},
     )
 
     assert failed_login_response.status_code == 401
 
     failed_login_response = test_client.post(
-        "/customer/login",
+        "/customers/login",
         json={"username": "wrongusername", "password": "password"},
     )
 
     assert failed_login_response.status_code == 401
 
-    get_response =  test_client.get("/customer/", headers={
+    get_response =  test_client.get("/customers/me", headers={
         "Authorization": f"Bearer {register_response.json()["jwt_token"]}"
     })
 
     assert get_response.status_code == 200
     assert result.id == get_response.json()["id"]
 
-    failed_get_response = test_client.get("/customer/", headers={
+    failed_get_response = test_client.get("/customers/me", headers={
         "Authorization": "Bearer Invalid"
     })
 

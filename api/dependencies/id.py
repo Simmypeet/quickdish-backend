@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.dependency.state import get_state
+from api.dependencies.state import get_state
 from api.errors.session import (
     ExpiredSessionError,
     InvalidHeaderSchemeError,

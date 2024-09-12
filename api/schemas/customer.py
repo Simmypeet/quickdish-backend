@@ -8,7 +8,7 @@ class CustomerBase(BaseModel):
     email: str
 
 
-class CutomerRegister(CustomerBase):
+class CustomerRegister(CustomerBase):
     password: str
 
 
@@ -17,13 +17,26 @@ class CustomerLogin(BaseModel):
     password: str
 
 
-class Customer(CustomerBase):
-    """
-    The schema for customer data. This schema contains all the data of the
-    customer including the private information.
-    """
+class PublicCustomer(CustomerBase):
+    """The schema for public customer data."""
 
     id: int
+
+    pass
+
+
+class PrivateCustomer(PublicCustomer):
+    """The schema for customer data that includes private information."""
+
+    pass
+
+
+class Customer(PrivateCustomer):
+    """
+    The schema for customer that includes all the information about the
+    customer. This schema should only be used internally.
+    """
+
     hashed_password: str
     salt: str
 

@@ -1,7 +1,5 @@
 from pydantic import BaseModel, ConfigDict
 
-from api.schemas.point import Point
-
 
 class MerchantBase(BaseModel):
     first_name: str
@@ -19,30 +17,24 @@ class MerchantLogin(BaseModel):
     password: str
 
 
-class RestaurantBase(BaseModel):
-    name: str
-    address: str
-    location: Point
+class PublicMerchant(MerchantBase):
+    """The schema for public merchant data."""
+
+    id: int
 
 
-class RestaurantCreate(RestaurantBase):
+class PrivateMerchant(PublicMerchant):
+    """The schema for merchant data that includes private information."""
+
     pass
 
 
-class Restaurant(RestaurantBase):
-    id: int
-    merchant_id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class Merchant(MerchantBase):
+class Merchant(PrivateMerchant):
     """
-    The schema for merchant data. This schema contains all the data of the
-    merchant including the private information.
+    The schema for merchant that includes all the information about the
+    merchant. This schema should only be used internally.
     """
 
-    id: int
     hashed_password: str
     salt: str
 

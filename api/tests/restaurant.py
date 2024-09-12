@@ -50,8 +50,8 @@ class TestRestaurnt:
 
 from fastapi.testclient import TestClient
 
-from api.dependency.state import get_state
-from api.models.merchant import Restaurant
+from api.dependencies.state import get_state
+from api.models.restaurant import Restaurant
 from api.schemas.point import Point
 from api.state import State
 from api import app
@@ -64,7 +64,7 @@ def test_restaurant(state_fixture: State):
     test_client = TestClient(app)
 
     response = test_client.post(
-        "/merchant/register",
+        "/merchants/register",
         json={
             "first_name": "John",
             "last_name": "Doe",
@@ -85,7 +85,7 @@ def test_restaurant(state_fixture: State):
     merchant_token = response.json()["jwt_token"]
 
     response = test_client.post(
-        "/merchant/restaurant",
+        "/restaurants",
         json={
             "name": "Test Restaurant",
             "address": "123 Test St",
