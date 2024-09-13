@@ -9,6 +9,7 @@ from api.models import Base
 import pytest
 
 import alembic.config
+import tempfile
 
 
 test_db = factories.postgresql_proc(port=None, dbname="test_db")  # type:ignore
@@ -51,5 +52,6 @@ def state_fixture(test_db: PostgreSQLExecutor):
                 bind=engine, autoflush=False, autocommit=False
             )
 
-            print("database created")
-            yield State(SessionLocal(), "mysecret")
+            temp_dir = tempfile.TemporaryDirectory()
+
+            yield State(SessionLocal(), "mysecret", temp_dir.name)

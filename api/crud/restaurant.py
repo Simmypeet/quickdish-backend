@@ -1,7 +1,8 @@
 import os
 from fastapi import UploadFile
+from fastapi.responses import FileResponse
 from api.crud.merchant import get_merchant
-from api.errors import ConflictingError, NotFoundError
+from api.errors import ConflictingError, FileContentTypeError, NotFoundError
 from api.errors.authentication import UnauthorizedError
 from api.errors.internal import InternalServerError
 from api.models.restaurant import Restaurant
@@ -90,6 +91,12 @@ async def upload_restaurant_image(
     if not image.filename:
         raise InternalServerError("image filename is empty")
 
+    if not image.content_type:
+        raise FileContentTypeError("unknown file content type")
+
+    if not image.content_type.startswith("image/"):
+        raise FileContentTypeError("file is not an image")
+
     image_extension = os.path.splitext(image.filename)[1]
 
     image_path = os.path.join(image_directory, f"image{image_extension}")
@@ -110,3 +117,26 @@ async def upload_restaurant_image(
     state.session.commit()
 
     return image_path
+
+
+async def get_restaurant_image(
+    state: State, restaurant_id: int
+) -> FileResponse | None:
+    """
+    Get the image of the restaurant. Returns None if the restaurant hasn't
+    uploaded an image yet.
+    """
+
+    restaurant = (
+        state.session.query(Restaurant)
+        .filter(Restaurant.id == restaurant_id)
+        .first()
+    )
+
+    if not restaurant:
+        raise NotFoundError("restaurant not found")
+
+    if not restaurant.image:  # type:ignore
+        return None
+
+    return FileResponse(restaurant.image)  # type:ignore

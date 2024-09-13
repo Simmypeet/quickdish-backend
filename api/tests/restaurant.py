@@ -48,6 +48,7 @@ class TestRestaurnt:
     def test_create_restaurant(self):
 """
 
+import os
 from fastapi.testclient import TestClient
 
 from api.dependencies.state import get_state
@@ -111,3 +112,39 @@ def test_restaurant(state_fixture: State):
     assert result.address == "123 Test St"  # type:ignore
     assert result.location == Point(lat=123, lng=123)  # type:ignore
     assert result.merchant_id == merchant_id
+
+    file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.jpg")
+
+    with open(file_path, "rb") as file:
+        # test restaurant image upload
+        response = test_client.put(
+            f"/restaurants/{result.id}/image",
+            files={"image": file},
+            headers={"Authorization": f"Bearer {merchant_token}"},
+        )
+
+        assert response.status_code == 200
+
+        # test restaurant image retrieval
+        response = test_client.get(
+            f"/restaurants/{result.id}/image",
+            headers={"Authorization": f"Bearer {merchant_token}"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["Content-Type"] == "image/jpeg"
+
+        with open(file_path, "rb") as file:
+            assert response.content == file.read()
+
+    # test uploading a non-image file
+    file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.txt")
+
+    with open(file_path, "rb") as file:
+        response = test_client.put(
+            f"/restaurants/{result.id}/image",
+            files={"image": file},
+            headers={"Authorization": f"Bearer {merchant_token}"},
+        )
+
+        assert response.status_code == 400

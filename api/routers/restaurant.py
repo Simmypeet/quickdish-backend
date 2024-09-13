@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
 
-from api.crud.restaurant import create_restaurant, upload_restaurant_image
+from api.crud.restaurant import (
+    create_restaurant,
+    upload_restaurant_image,
+    get_restaurant_image,
+)
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
+from api.errors import NotFoundError
 from api.schemas.restaurant import RestaurantCreate
 from api.state import State
 
@@ -56,3 +62,24 @@ async def upload_restaurant_image_api(
     )
 
     return "image uploaded"
+
+
+@router.get(
+    "/{restaurant_id}/image",
+    description="Get the image of the restaurant.",
+    response_class=FileResponse,
+)
+async def get_restuarnat_image_api(
+    restaurant_id: int,
+    state: State = Depends(get_state),
+) -> FileResponse:
+    image = await get_restaurant_image(state, restaurant_id)
+
+    match image:
+        case None:
+            raise NotFoundError(
+                "image not found, the restuarant hasn't uploaded an image yet"
+            )
+
+        case image:
+            return image

@@ -7,4 +7,4 @@ class InternalServerError(HTTPException):
     """
 
     def __init__(self, message: str) -> None:
-        super().__init__(status_code=500, detail=message)
+        super().__init__(status_code=500, detail={"error": message})
