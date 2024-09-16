@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer
 
 from api.crud.restaurant import (
     create_restaurant,
+    get_restaurant,
     upload_restaurant_image,
     get_restaurant_image,
 )
@@ -38,6 +39,17 @@ async def create_restaurant_api(
         result,
         restaurant,
     )
+
+
+@router.get(
+    "/{restaurant_id}",
+    description="Get the restaurant details.",
+)
+async def get_restaurant_api(
+    restaurant_id: int,
+    state: State = Depends(get_state),
+) -> RestaurantCreate:
+    return await get_restaurant(state, restaurant_id)
 
 
 @router.put(

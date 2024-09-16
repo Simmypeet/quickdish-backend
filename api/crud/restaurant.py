@@ -45,9 +45,7 @@ async def create_restaurant(
     return new_restaurant.id  # type:ignore
 
 
-async def get_restaurant(
-    state: State, restaurant_id: int, merchant_id: int
-) -> Restaurant:
+async def get_restaurant(state: State, restaurant_id: int) -> Restaurant:
     """Get a restaurant by its ID."""
 
     restaurant = (
@@ -59,9 +57,6 @@ async def get_restaurant(
     if not restaurant:
         raise NotFoundError("restaurant not found")
 
-    if restaurant.merchant_id != merchant_id:  # type:ignore
-        raise UnauthorizedError("merchant does not own this restaurant")
-
     return restaurant
 
 
@@ -69,7 +64,10 @@ async def upload_restaurant_image(
     state: State, restaurant_id: int, image: UploadFile, merchant_id: int
 ) -> str:
     """Upload an image for the restaurant."""
-    restaurant = await get_restaurant(state, restaurant_id, merchant_id)
+    restaurant = await get_restaurant(state, restaurant_id)
+
+    if restaurant.merchant_id != merchant_id:  # type:ignore
+        raise UnauthorizedError("merchant does not own this restaurant")
 
     # Save the image
     image_directory = os.path.join(
