@@ -1,7 +1,10 @@
 from typing import Any
+from fastapi import UploadFile
 import platformdirs
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from api.errors import FileContentTypeError
+from api.errors.internal import InternalServerError
 from api.models import Base
 
 import alembic.config
@@ -147,3 +150,58 @@ class State:
         hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
 
         return salt, hashsed_password
+
+    async def upload_image(
+        self, image: UploadFile, directory_path: str
+    ) -> str:
+        """Upload an image to the application data folder.
+
+        :param image: The image to upload.
+        :param path: The directory path to save the image.
+
+        Returns:
+            The path to the uploaded image.
+        """
+
+        image_directory = os.path.join(
+            self.application_data_path, directory_path
+        )
+
+        try:
+            os.makedirs(image_directory, exist_ok=True)
+        except OSError as e:
+            raise InternalServerError(
+                f"could not create image directory at {image_directory}: {e}"
+            )
+
+        if not os.path.isdir(image_directory):
+            raise InternalServerError(
+                f"{image_directory} is not a directory or not exists"
+            )
+
+        if not image.filename:
+            raise InternalServerError("image filename is empty")
+
+        if not image.content_type:
+            raise FileContentTypeError("unknown file content type")
+
+        if not image.content_type.startswith("image/"):
+            raise FileContentTypeError("file is not an image")
+
+        image_extension = os.path.splitext(image.filename)[1]
+
+        image_path = os.path.join(image_directory, f"image{image_extension}")
+
+        if not os.access(image_directory, os.W_OK):
+            raise InternalServerError(f"{image_directory} is not writable")
+
+        try:
+            with open(image_path, "wb") as f:
+                f.write(await image.read())
+
+        except Exception as e:
+            raise InternalServerError(
+                f"could not save image at `{image_path}`: {e}"
+            )
+
+        return image_path

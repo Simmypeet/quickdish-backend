@@ -74,44 +74,9 @@ async def upload_restaurant_image(
         state.application_data_path, "restaurants", str(restaurant_id)
     )
 
-    try:
-        os.makedirs(image_directory, exist_ok=True)
-    except OSError as e:
-        raise InternalServerError(
-            f"could not create image directory at {image_directory}: {e}"
-        )
-
-    if not os.path.isdir(image_directory):
-        raise InternalServerError(
-            f"{image_directory} is not a directory or not exists"
-        )
-
-    if not image.filename:
-        raise InternalServerError("image filename is empty")
-
-    if not image.content_type:
-        raise FileContentTypeError("unknown file content type")
-
-    if not image.content_type.startswith("image/"):
-        raise FileContentTypeError("file is not an image")
-
-    image_extension = os.path.splitext(image.filename)[1]
-
-    image_path = os.path.join(image_directory, f"image{image_extension}")
-
-    if not os.access(image_directory, os.W_OK):
-        raise InternalServerError(f"{image_directory} is not writable")
-
-    try:
-        with open(image_path, "wb") as f:
-            f.write(await image.read())
-
-    except Exception as e:
-        raise InternalServerError(
-            f"could not save image at `{image_path}`: {e}"
-        )
-
+    image_path = await state.upload_image(image, image_directory)
     restaurant.image = image_path  # type:ignore
+
     state.session.commit()
 
     return image_path
