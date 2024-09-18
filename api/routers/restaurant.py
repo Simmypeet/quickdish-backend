@@ -11,7 +11,12 @@ from api.crud.restaurant import (
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
 from api.errors import NotFoundError
-from api.schemas.restaurant import PublicRestaurant, RestaurantCreate
+from api.schemas.restaurant import (
+    CustomizationCreate,
+    Customization,
+    PublicRestaurant,
+    RestaurantCreate,
+)
 from api.state import State
 
 
@@ -95,3 +100,45 @@ async def get_restuarnat_image_api(
 
         case image:
             return image
+
+
+
+
+@router.post(
+    "/menus/{menu_id}/customizations",
+    description="""
+        Create a new customization for a menu.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def create_customization_api(
+    menu_id: int,
+    customization: CustomizationCreate,
+    state: State = Depends(get_state),
+    merchant_id: int = Depends(get_merchant_id),
+) -> int:
+    try:
+        return await create_customization(
+            state,
+            menu_id,
+            customization,
+            merchant_id,
+        )
+    except Exception as e:
+        print(e)
+        raise NotFoundError("menu not found")
+
+
+@router.get(
+    "/menus/{menu_id}/customizations",
+    description="""
+        Get list of customizations for a menu.
+    """,
+)
+async def get_menu_customizations_api(
+    menu_id: int, state: State = Depends(get_state)
+) -> list[Customization]:
+    return [
+        Customization.model_validate(customization)
+        for customization in await get_menu_customizations(state, menu_id)
+    ]

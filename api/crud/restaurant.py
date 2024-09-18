@@ -1,14 +1,17 @@
-import os
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
+
 from api.crud.merchant import get_merchant
-from api.errors import ConflictingError, FileContentTypeError, NotFoundError
+from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import UnauthorizedError
-from api.errors.internal import InternalServerError
-from api.models.restaurant import Restaurant
-from api.schemas.restaurant import RestaurantCreate
+from api.models.restaurant import Customization, Option, Restaurant
+from api.schemas.restaurant import (
+    CustomizationCreate,
+    RestaurantCreate,
+)
 from api.state import State
 
+import os
 
 async def create_restaurant(
     state: State, merchant_id: int, restaurant_create: RestaurantCreate
@@ -103,3 +106,109 @@ async def get_restaurant_image(
         return None
 
     return FileResponse(restaurant.image)  # type:ignore
+
+
+
+
+
+
+
+
+
+
+async def create_customization(
+    state: State,
+    menu_id: int,
+    customization: CustomizationCreate,
+    merchant_id: int,
+) -> int:
+    """Create a new customization for a menu."""
+    # check if the menu exists
+    menu = state.session.query(Menu).filter(Menu.id == menu_id).first()
+
+    if not menu:
+        raise NotFoundError("menu not found")
+
+    # check if the merchant owns the restaurant
+    restaurant = (
+        state.session.query(Restaurant)
+        .filter(Restaurant.id == menu.restaurant_id)
+        .first()
+    )
+
+    if restaurant.merchant_id != merchant_id:  # type:ignore
+        raise UnauthorizedError("merchant does not own the restaurant")
+
+    # check if the option with the same name in this customization exists
+    found_option: set[str] = set()
+    for option in customization.options:
+        if option.name in found_option:
+            raise ConflictingError(
+                f"an option {option.name} found more than once in the customization"
+            )
+
+        found_option.add(option.name)
+
+    # check if the customization with the same title in this menu exists
+    existing_customization = (
+        state.session.query(Customization)
+        .filter(
+            (Customization.title == customization.title)
+            & (Customization.menu_id == menu_id)
+        )
+        .first()
+    )
+
+    if existing_customization:
+        raise ConflictingError(
+            "a customization with the same title already exists in this menu"
+        )
+
+    new_customization = Customization(
+        menu_id=menu_id,
+        title=customization.title,
+        description=customization.description,
+        unique=customization.unique,
+        required=customization.required,
+    )
+
+    state.session.add(new_customization)
+    state.session.commit()
+
+    state.session.refresh(new_customization)
+
+    id = new_customization.id
+
+    for option in customization.options:
+        state.session.add(
+            Option(
+                customization_id=id,
+                name=option.name,
+                description=option.description,
+                extra_price=option.extra_price,
+            )
+        )
+
+    state.session.commit()
+
+    return id
+
+
+async def get_menu_customizations(
+    state: State,
+    menu_id: int,
+) -> list[Customization]:
+    """Get all customizations for a menu."""
+    # check if the menu exists
+    menu = state.session.query(Menu).filter(Menu.id == menu_id).first()
+
+    if not menu:
+        raise NotFoundError("menu not found")
+
+    customizations = (
+        state.session.query(Customization)
+        .filter(Customization.menu_id == menu_id)
+        .all()
+    )
+
+    return customizations

@@ -1,4 +1,13 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
+from decimal import Decimal
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+
 from api.models import Base
 from api.types.point import PointType
 
@@ -12,3 +21,34 @@ class Restaurant(Base):
     merchant_id = Column(Integer, ForeignKey("merchants.id"))
     image = Column(String, nullable=False)
     location = Column(PointType, nullable=False)
+
+
+
+
+class Option(Base):
+    __tablename__ = "options"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    customization_id: Mapped[int] = mapped_column(
+        ForeignKey("customizations.id")
+    )
+    name: Mapped[str]
+    description: Mapped[str | None]
+    extra_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=10, scale=2, asdecimal=True)
+    )
+
+
+class Customization(Base):
+    __tablename__ = "customizations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    menu_id: Mapped[int] = mapped_column(ForeignKey("menus.id"))
+    title: Mapped[str]
+    description: Mapped[str | None]
+    unique: Mapped[bool]
+    required: Mapped[bool]
+
+    options: Mapped[list[Option]] = relationship(
+        "Option", backref="customization"
+    )
