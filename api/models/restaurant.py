@@ -1,11 +1,5 @@
 from decimal import Decimal
-from sqlalchemy import (
-    Column,
-    ForeignKey,
-    Integer,
-    Numeric,
-    String,
-)
+from sqlalchemy import ForeignKey, Numeric
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from api.models import Base
@@ -27,15 +21,15 @@ class Restaurant(Base):
 class Menu(Base):
     __tablename__ = "menus"
 
-    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=False)
-    price = Column(
-        Numeric(precision=10, scale=2, asdecimal=True), nullable=False
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurants.id"))
+    name: Mapped[str]
+    description: Mapped[str]
+    price: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2, asdecimal=True)
     )
-    image = Column(String, nullable=True)
-    estimated_prep_time = Column(Integer, nullable=True)
+    image: Mapped[str | None]
+    estimated_prep_time: Mapped[int | None]
 
 
 class Option(Base):
