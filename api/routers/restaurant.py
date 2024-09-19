@@ -11,7 +11,7 @@ from api.crud.restaurant import (
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
 from api.errors import NotFoundError
-from api.schemas.restaurant import PublicRestaurant, RestaurantCreate
+from api.schemas.restaurant import Restaurant, RestaurantCreate
 from api.state import State
 
 
@@ -48,7 +48,7 @@ async def create_restaurant_api(
 async def get_restaurant_api(
     restaurant_id: int,
     state: State = Depends(get_state),
-) -> PublicRestaurant:
+) -> Restaurant:
     return await get_restaurant(state, restaurant_id)
 
 

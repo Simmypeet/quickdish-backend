@@ -6,9 +6,9 @@ from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
 from api.schemas.authentication import AuthenticationResponse
 from api.schemas.merchant import (
+    Merchant,
     MerchantLogin,
     MerchantRegister,
-    PublicMerchant,
 )
 from api.state import State
 
@@ -53,7 +53,7 @@ async def login_merchant_api(
 async def get_current_merchant_api(
     state: State = Depends(get_state),
     result: int = Depends(get_merchant_id),
-) -> PublicMerchant:
+) -> Merchant:
     return await get_merchant(state, result)
 
 
@@ -66,5 +66,5 @@ async def get_current_merchant_api(
 async def get_merchant_by_id_api(
     merchant_id: int,
     state: State = Depends(get_state),
-) -> PublicMerchant:
+) -> Merchant:
     return await get_merchant(state, merchant_id)
