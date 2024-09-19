@@ -22,7 +22,7 @@ DATABASE_URL=...
 JWT_SECRET=...
 ```
 
-where `DATABASE_URL` is the URL of the PostgreSQL database and `JWT_SECRET` is 
+where `DATABASE_URL` is the URL of the PostgreSQL database and `JWT_SECRET` is
 any arbitrary random string used to sign the JWT tokens.
 
 ## Running the Server
@@ -37,4 +37,10 @@ fastapi dev api/__init__.py
 
 ```bash
 pytest api/tests/*.py
+```
+
+## Running the Tests with Coverage Info
+
+```bash
+pytest --cov=api --cov-report=lcov:lcov.info --cov-report=term api/tests/*.py
 ```
