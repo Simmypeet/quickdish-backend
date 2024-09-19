@@ -14,22 +14,13 @@ class RestaurantCreate(RestaurantBase):
     pass
 
 
-class PublicRestaurant(RestaurantBase):
+class Restaurant(RestaurantBase):
     """
     The schema for public restaurant data.
     """
 
     id: int
     merchant_id: int
-
-
-class Restaurant(PublicRestaurant):
-    """
-    The schema for restaurant that includes all the information about the
-    restaurant. This schema should only be used internally.
-    """
-
-    image: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,20 +36,11 @@ class MenuCreate(BaseMenu):
     pass
 
 
-class PublicMenu(BaseMenu):
+class Menu(BaseMenu):
     """The schema for public menu data."""
 
     id: int
     restaurant_id: int
-
-
-class Menu(PublicMenu):
-    """
-    The schema for menu that includes all the information about the menu.
-    This schema should only be used internally.
-    """
-
-    image: str | None
 
     model_config = ConfigDict(from_attributes=True)
 

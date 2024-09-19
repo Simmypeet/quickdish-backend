@@ -17,27 +17,9 @@ class CustomerLogin(BaseModel):
     password: str
 
 
-class PublicCustomer(CustomerBase):
+class Customer(CustomerBase):
     """The schema for public customer data."""
 
     id: int
-
-    pass
-
-
-class PrivateCustomer(PublicCustomer):
-    """The schema for customer data that includes private information."""
-
-    pass
-
-
-class Customer(PrivateCustomer):
-    """
-    The schema for customer that includes all the information about the
-    customer. This schema should only be used internally.
-    """
-
-    hashed_password: str
-    salt: str
 
     model_config = ConfigDict(from_attributes=True)

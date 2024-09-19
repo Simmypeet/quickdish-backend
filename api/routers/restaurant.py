@@ -23,8 +23,7 @@ from api.schemas.restaurant import (
     Menu,
     MenuCreate,
     Customization,
-    PublicMenu,
-    PublicRestaurant,
+    Restaurant,
     RestaurantCreate,
 )
 from api.state import State
@@ -63,7 +62,7 @@ async def create_restaurant_api(
 async def get_restaurant_api(
     restaurant_id: int,
     state: State = Depends(get_state),
-) -> PublicRestaurant:
+) -> Restaurant:
     return await get_restaurant(state, restaurant_id)
 
 
@@ -120,7 +119,7 @@ async def get_restuarnat_image_api(
 )
 async def get_menu_api(
     menu_id: int, state: State = Depends(get_state)
-) -> PublicMenu:
+) -> Menu:
     return await get_menu(state, menu_id)
 
 
@@ -153,7 +152,7 @@ async def create_menu_api(
 )
 async def get_restaurant_menus_api(
     restaurant_id: int, state: State = Depends(get_state)
-) -> list[PublicMenu]:
+) -> list[Menu]:
     return [
         Menu.model_validate(menu)
         for menu in await get_restaurant_menus(state, restaurant_id)

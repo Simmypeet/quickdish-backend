@@ -8,7 +8,7 @@ from api.schemas.authentication import AuthenticationResponse
 from api.schemas.customer import (
     CustomerLogin,
     CustomerRegister,
-    PublicCustomer,
+    Customer,
 )
 from api.state import State
 
@@ -53,7 +53,7 @@ async def login_customer_api(
 async def get_current_customer_api(
     state: State = Depends(get_state),
     result: int = Depends(get_customer_id),
-) -> PublicCustomer:
+) -> Customer:
     return await get_customer(state, result)
 
 
@@ -66,5 +66,5 @@ async def get_current_customer_api(
 async def get_customer_by_id_api(
     customer_id: int,
     state: State = Depends(get_state),
-) -> PublicCustomer:
+) -> Customer:
     return await get_customer(state, customer_id)

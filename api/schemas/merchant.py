@@ -17,25 +17,17 @@ class MerchantLogin(BaseModel):
     password: str
 
 
-class PublicMerchant(MerchantBase):
+class Merchant(MerchantBase):
     """The schema for public merchant data."""
 
     id: int
 
-
-class PrivateMerchant(PublicMerchant):
-    """The schema for merchant data that includes private information."""
-
-    pass
+    model_config = ConfigDict(from_attributes=True)
 
 
-class Merchant(PrivateMerchant):
-    """
-    The schema for merchant that includes all the information about the
-    merchant. This schema should only be used internally.
-    """
+class Restaurant(MerchantBase):
+    """The schema for public merchant data."""
 
-    hashed_password: str
-    salt: str
+    id: int
 
     model_config = ConfigDict(from_attributes=True)
