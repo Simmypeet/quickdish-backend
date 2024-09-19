@@ -216,16 +216,12 @@ async def create_customization_api(
     state: State = Depends(get_state),
     merchant_id: int = Depends(get_merchant_id),
 ) -> int:
-    try:
-        return await create_customization(
-            state,
-            menu_id,
-            customization,
-            merchant_id,
-        )
-    except Exception as e:
-        print(e)
-        raise NotFoundError("menu not found")
+    return await create_customization(
+        state,
+        menu_id,
+        customization,
+        merchant_id,
+    )
 
 
 @router.get(
