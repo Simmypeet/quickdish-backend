@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from fastapi.testclient import TestClient
 
 from api.dependencies.state import get_state
@@ -49,7 +50,7 @@ def test_restaurant(state_fixture: State):
     assert response.status_code == 200
 
     # test restaurant conflicting
-    failed_respone = test_client.post(
+    failed_response = test_client.post(
         "/restaurants",
         json={
             "name": "Test Restaurant",
@@ -62,7 +63,7 @@ def test_restaurant(state_fixture: State):
         headers={"Authorization": f"Bearer {merchant_token}"},
     )
 
-    assert failed_respone.status_code == 409
+    assert failed_response.status_code == 409
 
     response = test_client.get(
         f"/restaurants/{response.json()}",
@@ -135,12 +136,7 @@ def test_restaurant(state_fixture: State):
 
     assert response.status_code == 200
 
-    merchant_id = jwt.decode(  # type:ignore
-        response.json()["jwt_token"],
-        state_fixture.jwt_secret,
-        algorithms=["HS256"],
-    )["merchant_id"]
-    merchant_token = response.json()["jwt_token"]
+    unauthorized_merchant_token = response.json()["jwt_token"]
 
     file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.jpg")
 
@@ -148,7 +144,189 @@ def test_restaurant(state_fixture: State):
         response = test_client.put(
             f"/restaurants/{restaurant_id}/image",
             files={"image": file},
-            headers={"Authorization": f"Bearer {merchant_token}"},
+            headers={"Authorization": f"Bearer {unauthorized_merchant_token}"},
         )
 
         assert response.status_code == 403
+
+    response = test_client.post(
+        f"/restaurants/{restaurant_id}/menus",
+        json={
+            "name": "Steak",
+            "description": "A juicy steak",
+            "price": 300.0,
+            "estimated_prep_time": 30,
+        },
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+
+    menu_id: int = response.json()
+
+    # test menu conflicting
+    failed_response = test_client.post(
+        f"/restaurants/{restaurant_id}/menus",
+        json={
+            "name": "Steak",
+            "description": "A less juicy steak",
+            "price": 150.0,
+            "estimated_prep_time": 15,
+        },
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert failed_response.status_code == 409
+
+    # test unauthorized merchant
+    failed_response = test_client.post(
+        f"/restaurants/{restaurant_id}/menus",
+        json={
+            "name": "Steak",
+            "description": "A less juicy steak",
+            "price": 150.0,
+            "estimated_prep_time": 15,
+        },
+        headers={"Authorization": f"Bearer {unauthorized_merchant_token}"},
+    )
+
+    assert failed_response.status_code == 403
+
+    # test get menu
+    response = test_client.get(
+        f"restaurants/menus/{menu_id}",
+    )
+
+    assert response.status_code == 200
+
+    assert response.json()["name"] == "Steak"
+    assert response.json()["description"] == "A juicy steak"
+    assert response.json()["price"] == "300.00"
+    assert response.json()["estimated_prep_time"] == 30
+    assert response.json()["id"] == menu_id
+
+    steak_menu_json = response.json()
+
+    response = test_client.get(
+        f"restaurants/{restaurant_id}/menus",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [steak_menu_json]
+
+    # create a new customization
+    customization_json: dict[str, Any] = {
+        "title": "Wellness",
+        "description": "Choose your wellness",
+        "unique": True,
+        "required": True,
+        "options": [
+            {
+                "name": "Medium",
+                "description": "Medium wellness",
+                "extra_price": 0.0,
+            },
+            {
+                "name": "Rare",
+                "description": None,
+                "extra_price": None,
+            },
+        ],
+    }
+    response = test_client.post(
+        f"/restaurants/menus/{menu_id}/customizations",
+        json=customization_json,
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+    customization_id: int = response.json()
+
+    failed_response = test_client.post(
+        f"/restaurants/menus/{menu_id}/customizations",
+        json=customization_json,
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert failed_response.status_code == 409
+
+    response = test_client.get(
+        f"/restaurants/menus/{menu_id}/customizations",
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+    customization = response.json()[0]
+
+    assert customization["title"] == "Wellness"
+    assert customization["description"] == "Choose your wellness"
+    assert customization["unique"]
+    assert customization["required"]
+    assert customization["id"] == customization_id
+    assert customization["menu_id"] == menu_id
+
+    assert len(customization["options"]) == 2
+
+    assert customization["options"][0]["name"] == "Medium"
+    assert customization["options"][0]["description"] == "Medium wellness"
+    assert customization["options"][0]["extra_price"] == "0.00"
+
+    assert customization["options"][1]["name"] == "Rare"
+    assert customization["options"][1]["description"] is None
+    assert customization["options"][1]["extra_price"] is None
+
+    faulty_options: dict[str, Any] = {
+        "title": "Sauce",
+        "description": "Choose your sauce",
+        "unique": False,
+        "required": False,
+        "options": [
+            {
+                "name": "Barbecue",
+                "description": "Barbecue sauce",
+                "extra_price": 0.0,
+            },
+            {
+                "name": "Barbecue",
+                "description": "Barbecue sauce",
+                "extra_price": 0.0,
+            },
+        ],
+    }
+
+    failed_response = test_client.post(
+        f"/restaurants/menus/{menu_id}/customizations",
+        json=faulty_options,
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert failed_response.status_code == 409
+
+    sauce_options: dict[str, Any] = {
+        "title": "Sauce",
+        "description": "Choose your sauce",
+        "unique": False,
+        "required": False,
+        "options": [
+            {
+                "name": "Barbecue",
+                "description": "Barbecue sauce",
+                "extra_price": 0.0,
+            },
+            {
+                "name": "Ketchup",
+                "description": "Ketchup sauce",
+                "extra_price": 0.0,
+            },
+        ],
+    }
+
+    # unauthorized merchant
+    failed_response = test_client.post(
+        f"/restaurants/menus/{menu_id}/customizations",
+        json=sauce_options,
+        headers={"Authorization": f"Bearer {unauthorized_merchant_token}"},
+    )
+
+    assert failed_response.status_code == 403
