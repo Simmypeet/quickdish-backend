@@ -178,15 +178,6 @@ async def get_restaurant_menus(
 ) -> list[Menu]:
     """Get all menus for a restaurant."""
     # check if the restaurant exists
-    restaurant = (
-        state.session.query(Restaurant)
-        .filter(Restaurant.id == restaurant_id)
-        .first()
-    )
-
-    if not restaurant:
-        raise NotFoundError("restaurant not found")
-
     menus = (
         state.session.query(Menu)
         .filter(Menu.restaurant_id == restaurant_id)
@@ -238,17 +229,14 @@ async def create_customization(
 ) -> int:
     """Create a new customization for a menu."""
     # check if the menu exists
-    menu = state.session.query(Menu).filter(Menu.id == menu_id).first()
-
-    if not menu:
-        raise NotFoundError("menu not found")
-
-    # check if the merchant owns the restaurant
     restaurant = (
         state.session.query(Restaurant)
-        .filter(Restaurant.id == menu.restaurant_id)
+        .filter((Menu.id == menu_id) & (Restaurant.id == Menu.restaurant_id))
         .first()
     )
+
+    if not restaurant:
+        raise NotFoundError("menu not found")
 
     if restaurant.merchant_id != merchant_id:  # type:ignore
         raise UnauthorizedError("merchant does not own the restaurant")
@@ -314,10 +302,6 @@ async def get_menu_customizations(
 ) -> list[Customization]:
     """Get all customizations for a menu."""
     # check if the menu exists
-    menu = state.session.query(Menu).filter(Menu.id == menu_id).first()
-
-    if not menu:
-        raise NotFoundError("menu not found")
 
     customizations = (
         state.session.query(Customization)
