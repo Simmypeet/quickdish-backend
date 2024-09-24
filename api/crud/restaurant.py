@@ -2,7 +2,7 @@ from fastapi import UploadFile
 from fastapi.responses import FileResponse
 
 from api.crud.merchant import get_merchant
-from api.errors import ConflictingError, NotFoundError
+from api.errors import ConflictingError, InvalidArgumentError, NotFoundError
 from api.errors.authentication import UnauthorizedError
 from api.models.restaurant import Customization, Option, Restaurant
 from api.models.restaurant import Menu
@@ -118,6 +118,13 @@ async def create_menu(
     merchant_id: int,
 ) -> int:
     """Create a new menu for a restaurant."""
+    # check if the price is valid
+    if menu.price < 0:
+        raise InvalidArgumentError("price can't be negative")
+
+    if menu.estimated_prep_time is not None and menu.estimated_prep_time < 0:
+        raise InvalidArgumentError("estimated prep time can't be negative")
+
     # check if the restaurant exists
     restaurant = (
         state.session.query(Restaurant)
@@ -244,6 +251,9 @@ async def create_customization(
     # check if the option with the same name in this customization exists
     found_option: set[str] = set()
     for option in customization.options:
+        if option.extra_price is not None and option.extra_price < 0:
+            raise InvalidArgumentError("extra price can't be negative")
+
         if option.name in found_option:
             raise ConflictingError(
                 f"an option {option.name} found more than once in the customization"
