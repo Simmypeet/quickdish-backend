@@ -13,7 +13,7 @@ def test_order(state_fixture: State):
     test_client = TestClient(app)
 
     # create a customer
-    customer_register_response = test_client.post(
+    first_customer_register_response = test_client.post(
         "/customers/register",
         json={
             "first_name": "John",
@@ -24,17 +24,41 @@ def test_order(state_fixture: State):
         },
     )
 
-    assert customer_register_response.status_code == 200
+    assert first_customer_register_response.status_code == 200
 
-    customer_jwt: str = customer_register_response.json()["jwt_token"]
-    _ = jwt.decode(  # type: ignore
-        customer_register_response.json()["jwt_token"],
+    first_customer_jwt: str = first_customer_register_response.json()[
+        "jwt_token"
+    ]
+    first_customer_id = jwt.decode(  # type: ignore
+        first_customer_register_response.json()["jwt_token"],
+        state_fixture.jwt_secret,
+        algorithms=["HS256"],
+    )["customer_id"]
+
+    second_customer_register_response = test_client.post(
+        "/customers/register",
+        json={
+            "first_name": "Jake",
+            "last_name": "Doe",
+            "username": "jakedoe",
+            "email": "jakedoe@test.com",
+            "password": "password",
+        },
+    )
+
+    assert second_customer_register_response.status_code == 200
+
+    second_customer_jwt: str = second_customer_register_response.json()[
+        "jwt_token"
+    ]
+    second_customer_id = jwt.decode(  # type: ignore
+        second_customer_register_response.json()["jwt_token"],
         state_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
 
     # create a merchant
-    merchant_register_response = test_client.post(
+    first_merchant_register_response = test_client.post(
         "/merchants/register",
         json={
             "first_name": "Jane",
@@ -45,17 +69,43 @@ def test_order(state_fixture: State):
         },
     )
 
-    assert merchant_register_response.status_code == 200
+    assert first_merchant_register_response.status_code == 200
 
-    _: str = merchant_register_response.json()["jwt_token"]
-    _ = jwt.decode(  # type: ignore
-        merchant_register_response.json()["jwt_token"],
+    first_merchant_jwt: str = first_merchant_register_response.json()[
+        "jwt_token"
+    ]
+
+    first_merchant_id = jwt.decode(  # type: ignore
+        first_merchant_register_response.json()["jwt_token"],
+        state_fixture.jwt_secret,
+        algorithms=["HS256"],
+    )["merchant_id"]
+
+    second_merchant_register_response = test_client.post(
+        "/merchants/register",
+        json={
+            "first_name": "Jack",
+            "last_name": "Doe",
+            "username": "jackdoe",
+            "email": "jackdoe@test.com",
+            "password": "password",
+        },
+    )
+
+    assert second_merchant_register_response.status_code == 200
+
+    second_merchant_jwt: str = second_merchant_register_response.json()[
+        "jwt_token"
+    ]
+
+    second_merchant_id = jwt.decode(  # type: ignore
+        second_merchant_register_response.json()["jwt_token"],
         state_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
 
     # create a steak restaurant
-    restaurant_create_response = test_client.post(
+    steak_restaurant_create_response = test_client.post(
         "/restaurants/",
         json={
             "name": "Steak House",
@@ -66,13 +116,13 @@ def test_order(state_fixture: State):
             },
         },
         headers={
-            "Authorization": f"Bearer {merchant_register_response.json()['jwt_token']}"
+            "Authorization": f"Bearer {first_merchant_register_response.json()['jwt_token']}"
         },
     )
 
-    assert restaurant_create_response.status_code == 200
+    assert steak_restaurant_create_response.status_code == 200
 
-    steak_restaurant_id: int = restaurant_create_response.json()
+    steak_restaurant_id: int = steak_restaurant_create_response.json()
 
     # create a steak menu
     steak_create_response = test_client.post(
@@ -84,7 +134,7 @@ def test_order(state_fixture: State):
             "estimated_prep_time": 10,
         },
         headers={
-            "Authorization": f"Bearer {merchant_register_response.json()['jwt_token']}"
+            "Authorization": f"Bearer {first_merchant_register_response.json()['jwt_token']}"
         },
     )
 
@@ -106,15 +156,13 @@ def test_order(state_fixture: State):
                 {"name": "Well-Done", "extra_price": 0.0, "description": None},
             ],
         },
-        headers={
-            "Authorization": f"Bearer {merchant_register_response.json()['jwt_token']}"
-        },
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
     )
 
     assert wellness_create_response.status_code == 200
 
     # create a burger restaurant
-    restaurant_create_response = test_client.post(
+    burger_restaurant_create_resoponse = test_client.post(
         "/restaurants/",
         json={
             "name": "Burger House",
@@ -124,16 +172,14 @@ def test_order(state_fixture: State):
                 "lng": 0,
             },
         },
-        headers={
-            "Authorization": f"Bearer {merchant_register_response.json()['jwt_token']}"
-        },
+        headers={"Authorization": f"Bearer {second_merchant_jwt}"},
     )
 
-    assert restaurant_create_response.status_code == 200
+    assert burger_restaurant_create_resoponse.status_code == 200
 
-    burger_restaurant_id: int = restaurant_create_response.json()
+    burger_restaurant_id: int = burger_restaurant_create_resoponse.json()
 
-    # create a steak menu
+    # create a burger menu
     burger_create_response = test_client.post(
         f"/restaurants/{burger_restaurant_id}/menus",
         json={
@@ -142,9 +188,7 @@ def test_order(state_fixture: State):
             "price": 10,
             "estimated_prep_time": 10,
         },
-        headers={
-            "Authorization": f"Bearer {merchant_register_response.json()['jwt_token']}"
-        },
+        headers={"Authorization": f"Bearer {second_merchant_jwt}"},
     )
 
     assert burger_create_response.status_code == 200
@@ -164,9 +208,7 @@ def test_order(state_fixture: State):
                 {"name": "Mayo", "extra_price": 0.0, "description": None},
             ],
         },
-        headers={
-            "Authorization": f"Bearer {merchant_register_response.json()['jwt_token']}"
-        },
+        headers={"Authorization": f"Bearer {second_merchant_jwt}"},
     )
 
     assert sauce_create_response.status_code == 200
@@ -201,13 +243,35 @@ def test_order(state_fixture: State):
         ],
     }
 
-    order_response = test_client.post(
+    first_order_response = test_client.post(
         "/orders/",
         json=steak_order,
-        headers={"Authorization": f"Bearer {customer_jwt}"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
     )
 
-    assert order_response.status_code == 200
+    assert first_order_response.status_code == 200
+
+    burger_order: dict[Any, Any] = {
+        "restaurant_id": burger_restaurant_id,
+        "items": [
+            {
+                "menu_id": burger_id,
+                "quantity": 1,
+                "extra_requests": "no salt",
+                "options": [
+                    {"option_id": source["options"][0]["id"]},
+                ],
+            }
+        ],
+    }
+
+    second_order_response = test_client.post(
+        "/orders/",
+        json=burger_order,
+        headers={"Authorization": f"Bearer {second_customer_jwt}"},
+    )
+
+    assert second_order_response.status_code == 200
 
     quantity_zero_order: dict[Any, Any] = deepcopy(steak_order)
     quantity_zero_order["items"][0]["quantity"] = 0
@@ -215,7 +279,7 @@ def test_order(state_fixture: State):
     quantity_zero_order_response = test_client.post(
         "/orders/",
         json=quantity_zero_order,
-        headers={"Authorization": f"Bearer {customer_jwt}"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
     )
 
     assert quantity_zero_order_response.status_code == 400
@@ -240,7 +304,7 @@ def test_order(state_fixture: State):
     restaurant_mismatched_order_response = test_client.post(
         "/orders/",
         json=restaurant_mismatched_order,
-        headers={"Authorization": f"Bearer {customer_jwt}"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
     )
 
     assert restaurant_mismatched_order_response.status_code == 400
@@ -253,7 +317,7 @@ def test_order(state_fixture: State):
     option_mismatched_order_response = test_client.post(
         "/orders/",
         json=option_mismatched_order,
-        headers={"Authorization": f"Bearer {customer_jwt}"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
     )
 
     assert option_mismatched_order_response.status_code == 400
@@ -269,7 +333,7 @@ def test_order(state_fixture: State):
     missing_option_order_response = test_client.post(
         "/orders/",
         json=missing_option_order,
-        headers={"Authorization": f"Bearer {customer_jwt}"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
     )
 
     assert missing_option_order_response.status_code == 400
@@ -287,7 +351,7 @@ def test_order(state_fixture: State):
     more_than_one_option_order_response = test_client.post(
         "/orders/",
         json=more_than_one_option_order,
-        headers={"Authorization": f"Bearer {customer_jwt}"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
     )
 
     assert more_than_one_option_order_response.status_code == 400
@@ -296,3 +360,72 @@ def test_order(state_fixture: State):
             "error": f"menu with id {steak_id} requires customization with id {wellness['id']} to be unique"
         }
     }
+
+    customer_get_orders_response = test_client.get(
+        "/orders/",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert customer_get_orders_response.status_code == 200
+    assert len(customer_get_orders_response.json()) == 1
+    assert (
+        customer_get_orders_response.json()[0]["customer_id"]
+        == first_customer_id
+    )
+    assert customer_get_orders_response.json()[0]["status"] == "ORDERED"
+    assert (
+        customer_get_orders_response.json()[0]["restaurant_id"]
+        == steak_restaurant_id
+    )
+    assert (
+        customer_get_orders_response.json()[0]["items"][0]["menu_id"]
+        == steak_id
+    )
+
+    customer_get_orders_response = test_client.get(
+        f"/orders/?restaurant_id={burger_restaurant_id}",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert customer_get_orders_response.status_code == 200
+    assert len(customer_get_orders_response.json()) == 0
+
+    customer_get_orders_response = test_client.get(
+        "/orders/?status=READY",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert customer_get_orders_response.status_code == 200
+    assert len(customer_get_orders_response.json()) == 0
+
+    customer_get_orders_response = test_client.get(
+        f"/orders/?status=ORDERED&restaurant_id={steak_restaurant_id}",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert customer_get_orders_response.status_code == 200
+    assert len(customer_get_orders_response.json()) == 1
+
+    merchant_get_orders_response = test_client.get(
+        "/orders/",
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert merchant_get_orders_response.status_code == 200
+    assert len(merchant_get_orders_response.json()) == 1
+    assert (
+        merchant_get_orders_response.json()[0]["id"]
+        == first_order_response.json()
+    )
+
+    merchant_get_orders_response = test_client.get(
+        "/orders/",
+        headers={"Authorization": f"Bearer {second_merchant_jwt}"},
+    )
+
+    assert merchant_get_orders_response.status_code == 200
+    assert len(merchant_get_orders_response.json()) == 1
+    assert (
+        merchant_get_orders_response.json()[0]["id"]
+        == second_order_response.json()
+    )
