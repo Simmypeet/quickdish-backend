@@ -1,8 +1,9 @@
 from decimal import Decimal
 from api.crud.restaurant import get_restaurant
+from api.dependencies.id import Role
 from api.errors import InvalidArgumentError, NotFoundError
 from api.models.order import Order, OrderItem, OrderOption
-from api.models.restaurant import Menu, Option, Customization
+from api.models.restaurant import Menu, Option, Customization, Restaurant
 from api.schemas.order import OrderCreate, OrderStatus
 from api.state import State
 
@@ -12,6 +13,8 @@ import time
 async def create_order(
     state: State, customer_id: int, payload: OrderCreate
 ) -> int:
+    """Creates a new order placed by a customer."""
+
     # check if the restaurant exists
     restaurant = await get_restaurant(state, payload.restaurant_id)
     price_paid = Decimal(0)
@@ -137,3 +140,51 @@ async def create_order(
             state.session.commit()
 
     return sql_order.id
+
+
+async def get_orders(
+    state: State,
+    user_id: int,
+    role: Role,
+    restaurant_id_filter: int | None,
+    status_filter: OrderStatus | None,
+) -> list[Order]:
+    match role:
+        case Role.CUSTOMER:
+            return (
+                state.session.query(Order)
+                .filter(
+                    (Order.customer_id == user_id)
+                    & (
+                        Order.status == status_filter
+                        if status_filter is not None
+                        else True
+                    )
+                    & (
+                        Order.restaurant_id == restaurant_id_filter
+                        if restaurant_id_filter is not None
+                        else True
+                    )
+                )
+                .all()
+            )
+
+        case Role.MERCHANT:
+            return (
+                state.session.query(Order)
+                .filter(
+                    (Restaurant.merchant_id == user_id)
+                    & (Order.restaurant_id == Restaurant.id)
+                    & (
+                        Order.status == status_filter
+                        if status_filter is not None
+                        else True
+                    )
+                    & (
+                        Order.restaurant_id == restaurant_id_filter
+                        if restaurant_id_filter is not None
+                        else True
+                    )
+                )
+                .all()
+            )
