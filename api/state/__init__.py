@@ -35,9 +35,13 @@ class State:
         """Initialize the state of the FastAPI application.
 
         :param session: The parameter is for testing pruposes only.
-        :param jwt_secret: The jwt secret key used to sign and verify Pass
+        :param jwt_secret: The jwt secret key used to sign and verify Pass \
             `None` to use the JWT_SECRET environment variable.
-        :param application_data_path: The path to the application data folder.
+        :param application_data_path: The path to the application data folder. \
+            If `None`, the state will look for `APPLICATION_DATA_PATH` in the \
+            environment variables. If not found, the state will use a \
+            directory `quickdish` in user data directory. The state will \
+            ensure that the directory exists and is writable.
 
         Raises:
             RuntimeError: if the DATABASE_URL or JWT_SECRET environment
@@ -82,8 +86,15 @@ class State:
         if application_data_path:
             self.__application_data_path = application_data_path
         else:
-            path: str = platformdirs.user_data_dir("quickdish", "quickdish")
-            self.__application_data_path = path
+            path_from_env = os.getenv("APPLICATION_DATA_PATH")
+
+            if path_from_env:
+                self.__application_data_path = path_from_env
+            else:
+                path: str = platformdirs.user_data_dir(
+                    "quickdish", "quickdish"
+                )
+                self.__application_data_path = path
 
         if not os.path.exists(self.__application_data_path):
             os.makedirs(self.__application_data_path, exist_ok=True)
@@ -97,6 +108,12 @@ class State:
         if not os.path.isdir(self.__application_data_path):
             raise RuntimeError(
                 f"{self.__application_data_path} is not a directory"
+            )
+
+        # check if it's writable
+        if not os.access(self.__application_data_path, os.W_OK):
+            raise RuntimeError(
+                f"{self.__application_data_path} is not writable"
             )
 
     @property
