@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    ports: 
+      - ${FORWARD_PORT}:${CONTAINER_PORT}
+    depends_on:
+      - db
+    volumes:
+      - api-data:/quickdish
+    command: uvicorn api:app --host 0.0.0.0 --port ${CONTAINER_PORT}
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - APPLICATION_DATA_PATH=/quickdish
+
+  db:
+    image: postgres:16
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    expose:
+      - ${DB_PORT}
+  
+
+volumes:
+  db-data:  
+  api-data:
