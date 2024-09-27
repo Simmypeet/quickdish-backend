@@ -51,7 +51,7 @@ def test_order(state_fixture: State):
     second_customer_jwt: str = second_customer_register_response.json()[
         "jwt_token"
     ]
-    second_customer_id = jwt.decode(  # type: ignore
+    _second_customer_id = jwt.decode(  # type: ignore
         second_customer_register_response.json()["jwt_token"],
         state_fixture.jwt_secret,
         algorithms=["HS256"],
@@ -75,7 +75,7 @@ def test_order(state_fixture: State):
         "jwt_token"
     ]
 
-    first_merchant_id = jwt.decode(  # type: ignore
+    _first_merchant_id = jwt.decode(  # type: ignore
         first_merchant_register_response.json()["jwt_token"],
         state_fixture.jwt_secret,
         algorithms=["HS256"],
@@ -98,7 +98,7 @@ def test_order(state_fixture: State):
         "jwt_token"
     ]
 
-    second_merchant_id = jwt.decode(  # type: ignore
+    _second_merchant_id = jwt.decode(  # type: ignore
         second_merchant_register_response.json()["jwt_token"],
         state_fixture.jwt_secret,
         algorithms=["HS256"],
@@ -372,7 +372,9 @@ def test_order(state_fixture: State):
         customer_get_orders_response.json()[0]["customer_id"]
         == first_customer_id
     )
-    assert customer_get_orders_response.json()[0]["status"] == "ORDERED"
+    assert (
+        customer_get_orders_response.json()[0]["status"]["type"] == "ORDERED"
+    )
     assert (
         customer_get_orders_response.json()[0]["restaurant_id"]
         == steak_restaurant_id

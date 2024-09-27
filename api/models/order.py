@@ -1,6 +1,6 @@
 from api.models import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from api.schemas.order import OrderCancelledBy, OrderStatus
+from api.schemas.order import OrderCancelledBy, OrderStatusFlag
 
 from decimal import Decimal
 from sqlalchemy import ForeignKey, Numeric, Enum, PrimaryKeyConstraint
@@ -74,8 +74,8 @@ class Order(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurants.id"))
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
-    status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus, name="order_status")
+    status: Mapped[OrderStatusFlag] = mapped_column(
+        Enum(OrderStatusFlag, name="order_status")
     )
     price_paid: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2, asdecimal=True)

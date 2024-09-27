@@ -2,9 +2,30 @@ from decimal import Decimal
 from api.crud.restaurant import get_restaurant
 from api.dependencies.id import Role
 from api.errors import InvalidArgumentError, NotFoundError
-from api.models.order import Order, OrderItem, OrderOption
+from api.errors.authentication import UnauthorizedError
+from api.errors.internal import InternalServerError
+from api.models.order import (
+    CancelledOrder,
+    Order,
+    OrderItem,
+    OrderOption,
+    PreparingOrder,
+    ReadyOrder,
+    SettledOrder,
+)
 from api.models.restaurant import Menu, Option, Customization, Restaurant
-from api.schemas.order import OrderCreate, OrderStatus
+from api.schemas.order import (
+    OrderCreate,
+    OrderStatusFlag,
+    OrderStatus,
+    OrderItem as OrderItemSchema,
+    Order as OrderSchema,
+    CancelledOrder as CancelledOrderSchema,
+    OrderedOrder as OrderedOrderSchema,
+    ReadyOrder as ReadyOrderSchema,
+    SettledOrder as SettledOrderSchema,
+    PreparingOrder as PreparingOrderSchema,
+)
 from api.state import State
 
 import time
@@ -111,7 +132,7 @@ async def create_order(
         restaurant_id=restaurant.id,
         ordered_at=ordered_at,
         price_paid=price_paid,
-        status=str(OrderStatus.ORDERED),
+        status=str(OrderStatusFlag.ORDERED),
     )
 
     state.session.add(sql_order)
@@ -142,12 +163,95 @@ async def create_order(
     return sql_order.id
 
 
+async def __get_status_no_validation(
+    state: State, order: Order
+) -> OrderStatus:
+    match order.status:
+        case OrderStatusFlag.ORDERED:
+            return OrderedOrderSchema()
+
+        case OrderStatusFlag.CANCELLED:
+            cancelled_query = (
+                state.session.query(CancelledOrder)
+                .filter(CancelledOrder.order_id == order.id)
+                .first()
+            )
+
+            if not cancelled_query:
+                # this should never happen
+                raise InternalServerError("can't find the cancelled order")
+
+            return CancelledOrderSchema(
+                cancelled_by=cancelled_query.cancelled_by,
+                cancelled_time=cancelled_query.cancelled_time,
+                reason=cancelled_query.reason,
+            )
+
+        case OrderStatusFlag.PREPARING:
+            preparing_query = (
+                state.session.query(PreparingOrder)
+                .filter(PreparingOrder.order_id == order.id)
+                .first()
+            )
+
+            if not preparing_query:
+                # this should never happen
+                raise InternalServerError("can't find the preparing order")
+
+            return PreparingOrderSchema(
+                prepared_at=preparing_query.prepared_at
+            )
+
+        case OrderStatusFlag.READY:
+            ready_query = (
+                state.session.query(ReadyOrder)
+                .filter(ReadyOrder.order_id == order.id)
+                .first()
+            )
+
+            if not ready_query:
+                # this should never happen
+                raise InternalServerError("can't find the ready order")
+
+            return ReadyOrderSchema(ready_at=ready_query.ready_at)
+
+        case OrderStatusFlag.SETTLED:
+            settled_query = (
+                state.session.query(SettledOrder)
+                .filter(SettledOrder.order_id == order.id)
+                .first()
+            )
+
+            if not settled_query:
+                # this should never happen
+                raise InternalServerError("can't find the settled order")
+
+            return SettledOrderSchema(settled_at=settled_query.settled_at)
+
+
+async def convert_to_schema(
+    state: State,
+    order: Order,
+) -> OrderSchema:
+    status = await __get_status_no_validation(state, order)
+
+    return OrderSchema(
+        id=order.id,
+        restaurant_id=order.restaurant_id,
+        customer_id=order.customer_id,
+        status=status,
+        ordered_at=order.ordered_at,
+        price_paid=order.price_paid,
+        items=[OrderItemSchema.model_validate(item) for item in order.items],
+    )
+
+
 async def get_orders(
     state: State,
     user_id: int,
     role: Role,
     restaurant_id_filter: int | None,
-    status_filter: OrderStatus | None,
+    status_filter: OrderStatusFlag | None,
 ) -> list[Order]:
     match role:
         case Role.CUSTOMER:
@@ -188,3 +292,32 @@ async def get_orders(
                 )
                 .all()
             )
+
+
+async def get_order_status(
+    state: State, user_id: int, role: Role, order_id: int
+) -> OrderStatus:
+    order = state.session.query(Order).filter(Order.id == order_id).first()
+
+    if not order:
+        raise NotFoundError("order with id {order_id} not found")
+
+    match role:
+        case Role.CUSTOMER:
+            if order.customer_id != user_id:
+                raise UnauthorizedError("customer does not own the order")
+
+        case Role.MERCHANT:
+            result = (
+                state.session.query(Restaurant)
+                .filter(
+                    (Restaurant.merchant_id == user_id)
+                    & (Restaurant.id == order.restaurant_id)
+                )
+                .first()
+            )
+
+            if not result:
+                raise UnauthorizedError("merchant does not own the order")
+
+    return await __get_status_no_validation(state, order)
