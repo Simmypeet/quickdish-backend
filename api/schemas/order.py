@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 from pydantic import BaseModel, ConfigDict
 from enum import StrEnum, unique
 
@@ -10,12 +11,43 @@ class OrderCancelledBy(StrEnum):
 
 
 @unique
-class OrderStatus(StrEnum):
+class OrderStatusFlag(StrEnum):
     ORDERED = "ORDERED"
     CANCELLED = "CANCELLED"
     PREPARING = "PREPARING"
     READY = "READY"
     SETTLED = "SETTLED"
+
+
+class OrderedOrder(BaseModel):
+    type: Literal[OrderStatusFlag.ORDERED] = OrderStatusFlag.ORDERED
+
+
+class CancelledOrder(BaseModel):
+    type: Literal[OrderStatusFlag.CANCELLED] = OrderStatusFlag.CANCELLED
+    cancelled_by: OrderCancelledBy
+    cancelled_time: int
+    reason: str | None
+
+
+class PreparingOrder(BaseModel):
+    type: Literal[OrderStatusFlag.PREPARING] = OrderStatusFlag.PREPARING
+    prepared_at: int
+
+
+class ReadyOrder(BaseModel):
+    type: Literal[OrderStatusFlag.READY] = OrderStatusFlag.READY
+    ready_at: int
+
+
+class SettledOrder(BaseModel):
+    type: Literal[OrderStatusFlag.SETTLED] = OrderStatusFlag.SETTLED
+    settled_at: int
+
+
+OrderStatus = (
+    OrderedOrder | CancelledOrder | PreparingOrder | ReadyOrder | SettledOrder
+)
 
 
 class OrderItemOptionBase(BaseModel):
