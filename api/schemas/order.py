@@ -19,34 +19,73 @@ class OrderStatusFlag(StrEnum):
     SETTLED = "SETTLED"
 
 
-class OrderedOrder(BaseModel):
+class OrderedOrderBase(BaseModel):
     type: Literal[OrderStatusFlag.ORDERED] = OrderStatusFlag.ORDERED
 
 
-class CancelledOrder(BaseModel):
+class OrderedOrder(OrderedOrderBase):
+    pass
+
+
+class CancelledOrderBase(BaseModel):
     type: Literal[OrderStatusFlag.CANCELLED] = OrderStatusFlag.CANCELLED
-    cancelled_by: OrderCancelledBy
-    cancelled_time: int
     reason: str | None
 
 
-class PreparingOrder(BaseModel):
+class CancelledOrderUpdate(CancelledOrderBase):
+    pass
+
+
+class CancelledOrder(CancelledOrderBase):
+    cancelled_by: OrderCancelledBy
+    cancelled_time: int
+
+
+class PreparingOrderBase(BaseModel):
     type: Literal[OrderStatusFlag.PREPARING] = OrderStatusFlag.PREPARING
+
+
+class PreparingOrderUpdate(PreparingOrderBase):
+    pass
+
+
+class PreparingOrder(PreparingOrderBase):
     prepared_at: int
 
 
-class ReadyOrder(BaseModel):
+class ReadyOrderBase(BaseModel):
     type: Literal[OrderStatusFlag.READY] = OrderStatusFlag.READY
+
+
+class ReadyOrderUpdate(ReadyOrderBase):
+    pass
+
+
+class ReadyOrder(ReadyOrderBase):
     ready_at: int
 
 
-class SettledOrder(BaseModel):
+class SettledOrderBase(BaseModel):
     type: Literal[OrderStatusFlag.SETTLED] = OrderStatusFlag.SETTLED
+
+
+class SettledOrderUpdate(SettledOrderBase):
+    pass
+
+
+class SettledOrder(SettledOrderBase):
     settled_at: int
 
 
 OrderStatus = (
     OrderedOrder | CancelledOrder | PreparingOrder | ReadyOrder | SettledOrder
+)
+
+OrderStatusUpdate = (
+    CancelledOrderUpdate
+    | PreparingOrderUpdate
+    | ReadyOrderUpdate
+    | SettledOrderUpdate
 )
 
 

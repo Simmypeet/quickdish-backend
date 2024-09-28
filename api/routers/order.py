@@ -1,17 +1,20 @@
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-from api.crud.order import convert_to_schema, create_order, get_orders
+from api.crud.order import (
+    convert_to_schema,
+    create_order,
+    get_order_status,
+    get_orders,
+    update_order_status,
+)
 from api.dependencies.state import get_state
 from api.schemas.order import (
-    CancelledOrder,
     Order,
     OrderCreate,
+    OrderStatus,
     OrderStatusFlag,
-    OrderedOrder,
-    PreparingOrder,
-    ReadyOrder,
-    SettledOrder,
+    OrderStatusUpdate,
 )
 from api.dependencies.id import Role, get_customer_id, get_user
 from api.state import State
@@ -63,7 +66,7 @@ async def get_orders_api(
 
 
 @router.get(
-    "/orders/{order_id}/status",
+    "/{order_id}/status",
     description="""
         Gets the status information of the current order. The API returns a 
         JSON with a key named "type" that indicates the status of the order. The
@@ -75,7 +78,26 @@ async def get_order_status_api(
     order_id: int,
     user: tuple[int, Role] = Depends(get_user),
     state: State = Depends(get_state),
-) -> (
-    OrderedOrder | CancelledOrder | PreparingOrder | ReadyOrder | SettledOrder
-):
-    raise NotImplementedError()
+) -> OrderStatus:
+    return await get_order_status(state, user[0], user[1], order_id)
+
+
+@router.put(
+    "/{order_id}/status",
+    description="""
+        Updates the status of the order. Customer can only update `SETTLED` when
+        the order is `READY` and `CANCELLED` when the order is `ORDERED`.
+        Merchant can update `PREPARING`, `READY` in sequential order, and
+        `CANCELLED` when the order is `ORDERED` or `PREPARING`.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def update_order_status_api(
+    order_id: int,
+    status: OrderStatusUpdate,
+    user: tuple[int, Role] = Depends(get_user),
+    state: State = Depends(get_state),
+) -> str:
+    await update_order_status(state, user[0], user[1], order_id, status)
+
+    return "success"

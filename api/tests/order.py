@@ -431,3 +431,125 @@ def test_order(state_fixture: State):
         merchant_get_orders_response.json()[0]["id"]
         == second_order_response.json()
     )
+
+    second_order_cancel_response = test_client.put(
+        f"/orders/{second_order_response.json()}/status",
+        json={"type": "CANCELLED", "reason": "i'm full"},
+        headers={"Authorization": f"Bearer {second_customer_jwt}"},
+    )
+
+    assert second_order_cancel_response.status_code == 200
+
+    get_second_order_status_response = test_client.get(
+        f"/orders/{second_order_response.json()}/status",
+        headers={"Authorization": f"Bearer {second_customer_jwt}"},
+    )
+
+    assert get_second_order_status_response.status_code == 200
+    assert get_second_order_status_response.json()["type"] == "CANCELLED"
+    assert (
+        get_second_order_status_response.json()["cancelled_by"] == "CUSTOMER"
+    )
+    assert get_second_order_status_response.json()["reason"] == "i'm full"
+
+    twice_cancel_response = test_client.put(
+        f"/orders/{second_order_response.json()}/status",
+        json={"type": "CANCELLED", "reason": "i'm full"},
+        headers={"Authorization": f"Bearer {second_customer_jwt}"},
+    )
+
+    assert twice_cancel_response.status_code == 400
+    assert twice_cancel_response.json() == {
+        "detail": {"error": "order can't be cancelled anymore"}
+    }
+
+    preparing_order_response = test_client.put(
+        f"/orders/{first_order_response.json()}/status",
+        json={"type": "PREPARING"},
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert preparing_order_response.status_code == 200
+
+    get_preparing_order_status_response = test_client.get(
+        f"/orders/{first_order_response.json()}/status",
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert get_preparing_order_status_response.status_code == 200
+    assert get_preparing_order_status_response.json()["type"] == "PREPARING"
+
+    ready_order_response = test_client.put(
+        f"/orders/{first_order_response.json()}/status",
+        json={"type": "READY"},
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert ready_order_response.status_code == 200
+
+    get_ready_order_status_response = test_client.get(
+        f"/orders/{first_order_response.json()}/status",
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert get_ready_order_status_response.status_code == 200
+
+    assert get_ready_order_status_response.json()["type"] == "READY"
+
+    merchant_settle_order_response = test_client.put(
+        f"/orders/{first_order_response.json()}/status",
+        json={"type": "SETTLED"},
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert merchant_settle_order_response.status_code == 400
+    assert merchant_settle_order_response.json() == {
+        "detail": {"error": "order can't be settled by merchant"}
+    }
+
+    customer_settle_order_response = test_client.put(
+        f"/orders/{first_order_response.json()}/status",
+        json={"type": "SETTLED"},
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert customer_settle_order_response.status_code == 200
+
+    get_settled_order_status_response = test_client.get(
+        f"/orders/{first_order_response.json()}/status",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert get_settled_order_status_response.status_code == 200
+    assert get_settled_order_status_response.json()["type"] == "SETTLED"
+
+    first_order_response = test_client.post(
+        "/orders/",
+        json=steak_order,
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert first_order_response.status_code == 200
+
+    merchant_cancel_order_response = test_client.put(
+        f"/orders/{first_order_response.json()}/status",
+        json={"type": "CANCELLED", "reason": "out of stock"},
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert merchant_cancel_order_response.status_code == 200
+
+    get_cancelled_order_status_response = test_client.get(
+        f"/orders/{first_order_response.json()}/status",
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert get_cancelled_order_status_response.status_code == 200
+    assert get_cancelled_order_status_response.json()["type"] == "CANCELLED"
+    assert (
+        get_cancelled_order_status_response.json()["cancelled_by"]
+        == "MERCHANT"
+    )
+    assert (
+        get_cancelled_order_status_response.json()["reason"] == "out of stock"
+    )
