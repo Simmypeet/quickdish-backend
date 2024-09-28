@@ -1,13 +1,19 @@
+from typing import AsyncGenerator
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
+from sse_starlette.sse import EventSourceResponse
 
 from api.crud.order import (
     convert_to_schema,
     create_order,
     get_order_status,
+    get_order_with_validation,
     get_orders,
+    get_queue,
     update_order_status,
+    OrderEvent,
 )
+from api.dependencies.order import get_order_event
 from api.dependencies.state import get_state
 from api.schemas.order import (
     Order,
@@ -15,9 +21,12 @@ from api.schemas.order import (
     OrderStatus,
     OrderStatusFlag,
     OrderStatusUpdate,
+    Queue,
 )
 from api.dependencies.id import Role, get_customer_id, get_user
 from api.state import State
+
+import asyncio
 
 
 router = APIRouter(
@@ -96,8 +105,59 @@ async def update_order_status_api(
     order_id: int,
     status: OrderStatusUpdate,
     user: tuple[int, Role] = Depends(get_user),
+    order_event: OrderEvent = Depends(get_order_event),
     state: State = Depends(get_state),
 ) -> str:
-    await update_order_status(state, user[0], user[1], order_id, status)
+    await update_order_status(
+        state, order_event, user[0], user[1], order_id, status
+    )
 
     return "success"
+
+
+@router.get(
+    "/{order_id}/queues",
+    description="""
+        Gets the queues of all orders in the same restaurant as the order.
+    """,
+)
+async def get_queue_api(
+    order_id: int,
+    user: tuple[int, Role] = Depends(get_user),
+    state: State = Depends(get_state),
+) -> Queue:
+    return await get_queue(state, user[0], user[1], order_id)
+
+
+@router.get(
+    "/{order_id}/events",
+    description="""
+        Returns a stream of events that are related to the order. The events are
+        in the form of JSON objects. The stream is kept open until the order is
+        settled, cancelled, or the connection is closed.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+    response_class=EventSourceResponse,
+)
+async def order_event_api(
+    order_id: int,
+    user: tuple[int, Role] = Depends(get_user),
+    order_event: OrderEvent = Depends(get_order_event),
+    state: State = Depends(get_state),
+) -> EventSourceResponse:
+    order = await get_order_with_validation(state, user[0], user[1], order_id)
+    order_event.register(order)
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        while True:
+            notifications = await order_event.get_notifications(order)
+
+            if notifications is None:
+                break
+
+            for notification in notifications:
+                yield str(notification.model_dump_json())
+
+            await asyncio.sleep(1)
+
+    return EventSourceResponse(event_generator())

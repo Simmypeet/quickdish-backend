@@ -1,4 +1,5 @@
 from decimal import Decimal
+from threading import Lock
 from api.crud.restaurant import get_restaurant
 from api.dependencies.id import Role
 from api.errors import InvalidArgumentError, NotFoundError
@@ -18,6 +19,7 @@ from api.schemas.order import (
     CancelledOrderUpdate,
     OrderCancelledBy,
     OrderCreate,
+    OrderNotification,
     OrderStatusFlag,
     OrderStatus,
     OrderItem as OrderItemSchema,
@@ -26,15 +28,136 @@ from api.schemas.order import (
     OrderStatusUpdate,
     OrderedOrder as OrderedOrderSchema,
     PreparingOrderUpdate,
+    Queue,
+    QueueChangeNotification,
     ReadyOrder as ReadyOrderSchema,
     ReadyOrderUpdate,
     SettledOrder as SettledOrderSchema,
     PreparingOrder as PreparingOrderSchema,
     SettledOrderUpdate,
+    StatusChangeNotification,
 )
 from api.state import State
 
 import time
+
+
+class OrderEvent:
+    """
+    A class used for managing order notifications.
+    """
+
+    __notifications_by_order_id: dict[Order, list[OrderNotification]]
+    __state: State
+    __mutex: Lock
+
+    def __init__(self, state: State) -> None:
+        self.__notifications_by_order_id = {}
+        self.__state = state
+        self.__mutex = Lock()
+
+    def register(self, order: Order) -> bool:
+        """
+        Registers the order so that it will recieve further notifications.
+
+        Raises:
+            InvalidArgumentError: if the `order` status is `SETTLED` or
+                `CANCELLED`.
+
+        Returns:
+            bool: `True` if the `order` hasn't been registered before; `False`,
+                otherwise.
+        """
+
+        with self.__mutex:
+            if (
+                order.status == OrderStatusFlag.SETTLED
+                or order.status == OrderStatusFlag.CANCELLED
+            ):
+                raise InvalidArgumentError(
+                    "the order is already settled or cancelled"
+                )
+
+            if order not in self.__notifications_by_order_id:
+                self.__notifications_by_order_id[order] = []
+                return True
+
+            return False
+
+    async def order_status_change(self, order: Order):
+        """
+        Creates a status change notification for the particular order (if
+        registered). This as well creates a queue change notification for other
+        orders in the same restaurant.
+        """
+
+        with self.__mutex:
+            if order in self.__notifications_by_order_id:
+                self.__notifications_by_order_id[order].append(
+                    StatusChangeNotification(
+                        order_id=order.id,
+                        status=await get_order_status_no_validation(
+                            self.__state, order
+                        ),
+                    )
+                )
+
+            if (
+                order.status != OrderStatusFlag.SETTLED
+                and order.status != OrderStatusFlag.CANCELLED
+            ):
+                return
+
+            for other_order in self.__notifications_by_order_id:
+                if other_order == order:
+                    continue
+
+                if other_order.restaurant_id != order.restaurant_id:
+                    continue
+
+                notification = QueueChangeNotification(
+                    order_id=other_order.id,
+                    queue=await get_queue_no_validation(
+                        self.__state, other_order
+                    ),
+                )
+
+                self.__notifications_by_order_id[other_order].append(
+                    notification
+                )
+
+    async def get_notifications(
+        self, order: Order
+    ) -> list[OrderNotification] | None:
+        """Gets the notifications for the particular order.
+
+        Args:
+            order (Order): The order to get notifications for.
+
+        Returns:
+            Returns `None` if the order isn't registered or there won't be any
+            notifications. Returns a list notifications if has one; otherwise,
+            an empty list is returned.
+
+            The empty list is returned meaning the order is still registered
+            but there are no notifications for it.
+        """
+
+        with self.__mutex:
+            if order not in self.__notifications_by_order_id:
+                return None
+
+            notifications = self.__notifications_by_order_id[order]
+
+            if (
+                order.status == OrderStatusFlag.SETTLED
+                or order.status == OrderStatusFlag.CANCELLED
+            ):
+                del self.__notifications_by_order_id[order]
+            else:
+                self.__notifications_by_order_id[order] = []
+
+            return notifications
 
 
 async def create_order(
@@ -169,7 +292,7 @@ async def create_order(
     return sql_order.id
 
 
-async def __get_status_no_validation(
+async def get_order_status_no_validation(
     state: State, order: Order
 ) -> OrderStatus:
     match order.status:
@@ -239,7 +362,7 @@ async def convert_to_schema(
     state: State,
     order: Order,
 ) -> OrderSchema:
-    status = await __get_status_no_validation(state, order)
+    status = await get_order_status_no_validation(state, order)
 
     return OrderSchema(
         id=order.id,
@@ -300,7 +423,7 @@ async def get_orders(
             )
 
 
-async def __get_order_with_validation(
+async def get_order_with_validation(
     state: State,
     user_id: int,
     role: Role,
@@ -335,19 +458,20 @@ async def __get_order_with_validation(
 async def get_order_status(
     state: State, user_id: int, role: Role, order_id: int
 ) -> OrderStatus:
-    order = await __get_order_with_validation(state, user_id, role, order_id)
+    order = await get_order_with_validation(state, user_id, role, order_id)
 
-    return await __get_status_no_validation(state, order)
+    return await get_order_status_no_validation(state, order)
 
 
 async def update_order_status(
     state: State,
+    order_event: OrderEvent,
     user_id: int,
     role: Role,
     order_id: int,
     status: OrderStatusUpdate,
 ) -> None:
-    order = await __get_order_with_validation(state, user_id, role, order_id)
+    order = await get_order_with_validation(state, user_id, role, order_id)
 
     match role, order.status, status:
         # still can cancel the order
@@ -361,14 +485,18 @@ async def update_order_status(
                 )
             )
             order.status = OrderStatusFlag.CANCELLED
+
             state.session.commit()
+            await order_event.order_status_change(order)
 
         case Role.CUSTOMER, OrderStatusFlag.READY, SettledOrderUpdate():
             state.session.add(
                 SettledOrder(order_id=order.id, settled_at=int(time.time()))
             )
             order.status = OrderStatusFlag.SETTLED
+
             state.session.commit()
+            await order_event.order_status_change(order)
 
         case Role.CUSTOMER, _, CancelledOrderUpdate():
             raise InvalidArgumentError("order can't be cancelled anymore")
@@ -388,7 +516,9 @@ async def update_order_status(
                 PreparingOrder(order_id=order.id, prepared_at=int(time.time()))
             )
             order.status = OrderStatusFlag.PREPARING
+
             state.session.commit()
+            await order_event.order_status_change(order)
 
         case Role.MERCHANT, _, PreparingOrderUpdate():
             raise InvalidArgumentError("order can be prepared only once")
@@ -398,7 +528,9 @@ async def update_order_status(
                 ReadyOrder(order_id=order.id, ready_at=int(time.time()))
             )
             order.status = OrderStatusFlag.READY
+
             state.session.commit()
+            await order_event.order_status_change(order)
 
         case Role.MERCHANT, _, ReadyOrderUpdate():
             raise InvalidArgumentError(
@@ -419,10 +551,57 @@ async def update_order_status(
                 )
             )
             order.status = OrderStatusFlag.CANCELLED
+
             state.session.commit()
+            await order_event.order_status_change(order)
 
         case (Role.MERCHANT, _, CancelledOrderUpdate()):
             raise InvalidArgumentError("order can't be cancelled anymore")
 
         case Role.MERCHANT, _, SettledOrderUpdate():
             raise InvalidArgumentError("order can't be settled by merchant")
+
+
+async def get_queue(
+    state: State, user_id: int, role: Role, order_id: int
+) -> Queue:
+    order = await get_order_with_validation(state, user_id, role, order_id)
+
+    return await get_queue_no_validation(state, order)
+
+
+async def get_queue_no_validation(state: State, order: Order) -> Queue:
+    prior_orders = (
+        state.session.query(Order)
+        .filter(
+            (Order.restaurant_id == order.restaurant_id)
+            & (Order.ordered_at <= order.ordered_at)
+            & (Order.id < order.id)
+            & (
+                (Order.status == OrderStatusFlag.ORDERED)
+                | (Order.status == OrderStatusFlag.PREPARING)
+            )
+        )
+        .all()
+    )
+
+    estimated_time = 0
+
+    for prior_order in prior_orders:
+        for order_item in prior_order.items:
+            menu = (
+                state.session.query(Menu)
+                .filter(Menu.id == order_item.menu_id)
+                .first()
+            )
+
+            if not menu:
+                raise InternalServerError(
+                    "can't find the menu for the order item"
+                )
+
+            estimated_time += (
+                menu.estimated_prep_time if menu.estimated_prep_time else 1
+            ) * order_item.quantity
+
+    return Queue(queue_count=len(prior_orders), estimated_time=estimated_time)
