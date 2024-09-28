@@ -553,3 +553,29 @@ def test_order(state_fixture: State):
     assert (
         get_cancelled_order_status_response.json()["reason"] == "out of stock"
     )
+
+    _: int = test_client.post(
+        "/orders/",
+        json=steak_order,
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    ).json()
+    _: int = test_client.post(
+        "/orders/",
+        json=steak_order,
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    ).json()
+    third_order_id: int = test_client.post(
+        "/orders/",
+        json=steak_order,
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    ).json()
+
+    third_order_queue = test_client.get(
+        f"/orders/{third_order_id}/queues",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert third_order_queue.status_code == 200
+
+    assert third_order_queue.json()["queue_count"] == 2
+    assert third_order_queue.json()["estimated_time"] == 20
