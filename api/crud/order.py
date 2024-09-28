@@ -15,16 +15,22 @@ from api.models.order import (
 )
 from api.models.restaurant import Menu, Option, Customization, Restaurant
 from api.schemas.order import (
+    CancelledOrderUpdate,
+    OrderCancelledBy,
     OrderCreate,
     OrderStatusFlag,
     OrderStatus,
     OrderItem as OrderItemSchema,
     Order as OrderSchema,
     CancelledOrder as CancelledOrderSchema,
+    OrderStatusUpdate,
     OrderedOrder as OrderedOrderSchema,
+    PreparingOrderUpdate,
     ReadyOrder as ReadyOrderSchema,
+    ReadyOrderUpdate,
     SettledOrder as SettledOrderSchema,
     PreparingOrder as PreparingOrderSchema,
+    SettledOrderUpdate,
 )
 from api.state import State
 
@@ -294,9 +300,12 @@ async def get_orders(
             )
 
 
-async def get_order_status(
-    state: State, user_id: int, role: Role, order_id: int
-) -> OrderStatus:
+async def __get_order_with_validation(
+    state: State,
+    user_id: int,
+    role: Role,
+    order_id: int,
+) -> Order:
     order = state.session.query(Order).filter(Order.id == order_id).first()
 
     if not order:
@@ -320,4 +329,100 @@ async def get_order_status(
             if not result:
                 raise UnauthorizedError("merchant does not own the order")
 
+    return order
+
+
+async def get_order_status(
+    state: State, user_id: int, role: Role, order_id: int
+) -> OrderStatus:
+    order = await __get_order_with_validation(state, user_id, role, order_id)
+
     return await __get_status_no_validation(state, order)
+
+
+async def update_order_status(
+    state: State,
+    user_id: int,
+    role: Role,
+    order_id: int,
+    status: OrderStatusUpdate,
+) -> None:
+    order = await __get_order_with_validation(state, user_id, role, order_id)
+
+    match role, order.status, status:
+        # still can cancel the order
+        case Role.CUSTOMER, OrderStatusFlag.ORDERED, CancelledOrderUpdate():
+            state.session.add(
+                CancelledOrder(
+                    order_id=order.id,
+                    cancelled_time=int(time.time()),
+                    cancelled_by=OrderCancelledBy.CUSTOMER,
+                    reason=status.reason,
+                )
+            )
+            order.status = OrderStatusFlag.CANCELLED
+            state.session.commit()
+
+        case Role.CUSTOMER, OrderStatusFlag.READY, SettledOrderUpdate():
+            state.session.add(
+                SettledOrder(order_id=order.id, settled_at=int(time.time()))
+            )
+            order.status = OrderStatusFlag.SETTLED
+            state.session.commit()
+
+        case Role.CUSTOMER, _, CancelledOrderUpdate():
+            raise InvalidArgumentError("order can't be cancelled anymore")
+
+        case Role.CUSTOMER, _, SettledOrderUpdate():
+            raise InvalidArgumentError(
+                "order can only be settled when it's ready"
+            )
+
+        case Role.CUSTOMER, _, _:
+            raise InvalidArgumentError(
+                "only cancellation or settled are allowed"
+            )
+
+        case Role.MERCHANT, OrderStatusFlag.ORDERED, PreparingOrderUpdate():
+            state.session.add(
+                PreparingOrder(order_id=order.id, prepared_at=int(time.time()))
+            )
+            order.status = OrderStatusFlag.PREPARING
+            state.session.commit()
+
+        case Role.MERCHANT, _, PreparingOrderUpdate():
+            raise InvalidArgumentError("order can be prepared only once")
+
+        case Role.MERCHANT, OrderStatusFlag.PREPARING, ReadyOrderUpdate():
+            state.session.add(
+                ReadyOrder(order_id=order.id, ready_at=int(time.time()))
+            )
+            order.status = OrderStatusFlag.READY
+            state.session.commit()
+
+        case Role.MERCHANT, _, ReadyOrderUpdate():
+            raise InvalidArgumentError(
+                "order can be ready after it's prepared"
+            )
+
+        case (
+            Role.MERCHANT,
+            (OrderStatusFlag.PREPARING | OrderStatusFlag.ORDERED),
+            CancelledOrderUpdate(),
+        ):
+            state.session.add(
+                CancelledOrder(
+                    order_id=order.id,
+                    cancelled_time=int(time.time()),
+                    cancelled_by=OrderCancelledBy.MERCHANT,
+                    reason=status.reason,
+                )
+            )
+            order.status = OrderStatusFlag.CANCELLED
+            state.session.commit()
+
+        case (Role.MERCHANT, _, CancelledOrderUpdate()):
+            raise InvalidArgumentError("order can't be cancelled anymore")
+
+        case Role.MERCHANT, _, SettledOrderUpdate():
+            raise InvalidArgumentError("order can't be settled by merchant")
