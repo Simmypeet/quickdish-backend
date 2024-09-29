@@ -1,3 +1,4 @@
+import sys
 from typing import AsyncGenerator
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
@@ -15,6 +16,7 @@ from api.crud.order import (
 )
 from api.dependencies.order import get_order_event
 from api.dependencies.state import get_state
+from api.errors import InvalidArgumentError
 from api.schemas.order import (
     Order,
     OrderCreate,
@@ -63,15 +65,27 @@ async def create_order_api(
 async def get_orders_api(
     user: tuple[int, Role] = Depends(get_user),
     restaurant_id: int | None = None,
-    status: OrderStatusFlag | None = None,
+    status: str | None = None,
     state: State = Depends(get_state),
 ) -> list[Order]:
-    id, role = user
+    try:
+        id, role = user
 
-    return [
-        await convert_to_schema(state, order)
-        for order in await get_orders(state, id, role, restaurant_id, status)
-    ]
+        statuses = []
+
+        if status is not None:
+            split_status = status.split("|")
+            statuses = [OrderStatusFlag[status] for status in split_status]
+
+        return [
+            await convert_to_schema(state, order)
+            for order in await get_orders(
+                state, id, role, restaurant_id, statuses
+            )
+        ]
+
+    except KeyError as e:
+        raise InvalidArgumentError(f"status flag {e} is not valid")
 
 
 @router.get(
