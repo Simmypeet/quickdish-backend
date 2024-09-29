@@ -1,5 +1,7 @@
 from decimal import Decimal
 from threading import Lock
+
+from sqlalchemy import ColumnElement, false, or_
 from api.crud.restaurant import get_restaurant
 from api.dependencies.id import Role
 from api.errors import InvalidArgumentError, NotFoundError
@@ -380,17 +382,22 @@ async def get_orders(
     user_id: int,
     role: Role,
     restaurant_id_filter: int | None,
-    status_filter: OrderStatusFlag | None,
+    status_filter: list[OrderStatusFlag],
 ) -> list[Order]:
+    status_filter_query: list[ColumnElement[bool]] = []
+    for status in status_filter:
+        status_filter_query.append(Order.status == status)
+
     match role:
         case Role.CUSTOMER:
+
             return (
                 state.session.query(Order)
                 .filter(
                     (Order.customer_id == user_id)
                     & (
-                        Order.status == status_filter
-                        if status_filter is not None
+                        or_(false(), *status_filter_query)
+                        if len(status_filter_query) != 0
                         else True
                     )
                     & (
@@ -409,8 +416,8 @@ async def get_orders(
                     (Restaurant.merchant_id == user_id)
                     & (Order.restaurant_id == Restaurant.id)
                     & (
-                        Order.status == status_filter
-                        if status_filter is not None
+                        or_(false(), *status_filter_query)
+                        if len(status_filter_query) != 0
                         else True
                     )
                     & (
