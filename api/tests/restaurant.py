@@ -86,7 +86,7 @@ def test_restaurant(state_fixture: State):
         f"/restaurants/{restaurant_id}/image",
     )
 
-    assert failed_response.status_code == 404
+    assert failed_response.status_code == 204
 
     with open(file_path, "rb") as file:
         # test restaurant image upload

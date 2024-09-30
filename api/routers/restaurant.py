@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, UploadFile
+import sys
+from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
 
@@ -93,19 +94,32 @@ async def upload_restaurant_image_api(
 @router.get(
     "/{restaurant_id}/image",
     description="Get the image of the restaurant.",
-    response_class=FileResponse,
+    responses={
+        204: {
+            "description": "the resaurant does not have an image",
+            "content": {"application/json": {}},
+        },
+        200: {
+            "description": "The image of the restaurant",
+            "content": {
+                "image/*": {},
+            },
+        },
+    },
+    response_model=None,
+    response_class=Response,
 )
 async def get_restuarnat_image_api(
     restaurant_id: int,
+    response: Response,
     state: State = Depends(get_state),
-) -> FileResponse:
+) -> FileResponse | None:
     image = await get_restaurant_image(state, restaurant_id)
 
     match image:
         case None:
-            raise NotFoundError(
-                "image not found, the restuarant hasn't uploaded an image yet"
-            )
+            response.status_code = status.HTTP_204_NO_CONTENT
+            return None
 
         case image:
             return image
@@ -184,20 +198,30 @@ async def upload_menu_image_api(
 
 @router.get(
     "/menus/{menu_id}/image",
-    description="""
-        Get the image of a menu.
-    """,
+    responses={
+        204: {
+            "description": "the menu does not have an image",
+            "content": {"application/json": {}},
+        },
+        200: {
+            "description": "The image of the menu",
+            "content": {
+                "image/*": {},
+            },
+        },
+    },
+    response_model=None,
+    response_class=Response,
 )
 async def get_menu_image_api(
-    menu_id: int, state: State = Depends(get_state)
-) -> FileResponse:
+    menu_id: int, response: Response, state: State = Depends(get_state)
+) -> FileResponse | None:
     image = await get_menu_image(state, menu_id)
 
     match image:
         case None:
-            raise NotFoundError(
-                "image not found, the menu hasn't uploaded an image yet"
-            )
+            response.status_code = status.HTTP_204_NO_CONTENT
+            return None
 
         case image:
             return image
