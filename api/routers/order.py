@@ -1,4 +1,3 @@
-import sys
 from typing import AsyncGenerator
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
