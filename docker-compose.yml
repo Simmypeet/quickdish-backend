@@ -9,9 +9,9 @@ services:
       - api-data:/quickdish
     command: uvicorn api:app --host 0.0.0.0 --port ${CONTAINER_PORT}
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}
-      - JWT_SECRET=${JWT_SECRET}
-      - APPLICATION_DATA_PATH=/quickdish
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      APPLICATION_DATA_PATH: /quickdish
 
   db:
     image: postgres:16
