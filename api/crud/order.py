@@ -119,7 +119,7 @@ class OrderEvent:
 
                 notification = QueueChangeNotification(
                     order_id=other_order.id,
-                    queue=await get_queue_no_validation(
+                    queue=await get_order_queue_no_validation(
                         self.__state, other_order
                     ),
                 )
@@ -569,21 +569,22 @@ async def update_order_status(
             raise InvalidArgumentError("order can't be settled by merchant")
 
 
-async def get_queue(
+async def get_order_queue(
     state: State, user_id: int, role: Role, order_id: int
 ) -> Queue:
     order = await get_order_with_validation(state, user_id, role, order_id)
 
-    return await get_queue_no_validation(state, order)
+    return await get_order_queue_no_validation(state, order)
 
 
-async def get_queue_no_validation(state: State, order: Order) -> Queue:
-    prior_orders = (
+async def get_restaurant_queue(
+    state: State,
+    restaurant_id: int,
+) -> Queue:
+    orders = (
         state.session.query(Order)
         .filter(
-            (Order.restaurant_id == order.restaurant_id)
-            & (Order.ordered_at <= order.ordered_at)
-            & (Order.id < order.id)
+            (Order.restaurant_id == restaurant_id)
             & (
                 (Order.status == OrderStatusFlag.ORDERED)
                 | (Order.status == OrderStatusFlag.PREPARING)
@@ -592,6 +593,12 @@ async def get_queue_no_validation(state: State, order: Order) -> Queue:
         .all()
     )
 
+    return __calculate_queue_from_prior_orders(state, orders)
+
+
+def __calculate_queue_from_prior_orders(
+    state: State, prior_orders: list[Order]
+) -> Queue:
     estimated_time = 0
 
     for prior_order in prior_orders:
@@ -612,3 +619,21 @@ async def get_queue_no_validation(state: State, order: Order) -> Queue:
             ) * order_item.quantity
 
     return Queue(queue_count=len(prior_orders), estimated_time=estimated_time)
+
+
+async def get_order_queue_no_validation(state: State, order: Order) -> Queue:
+    prior_orders = (
+        state.session.query(Order)
+        .filter(
+            (Order.restaurant_id == order.restaurant_id)
+            & (Order.ordered_at <= order.ordered_at)
+            & (Order.id < order.id)
+            & (
+                (Order.status == OrderStatusFlag.ORDERED)
+                | (Order.status == OrderStatusFlag.PREPARING)
+            )
+        )
+        .all()
+    )
+
+    return __calculate_queue_from_prior_orders(state, prior_orders)

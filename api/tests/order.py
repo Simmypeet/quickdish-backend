@@ -579,3 +579,13 @@ def test_order(state_fixture: State):
 
     assert third_order_queue.json()["queue_count"] == 2
     assert third_order_queue.json()["estimated_time"] == 20
+
+    restaurant_queue = test_client.get(
+        f"/orders/queues/?restaurant_id={steak_restaurant_id}",
+    )
+
+    assert restaurant_queue.status_code == 200
+
+    assert restaurant_queue.json()["queue_count"] == 3
+    assert restaurant_queue.json()["estimated_time"] == 30
+

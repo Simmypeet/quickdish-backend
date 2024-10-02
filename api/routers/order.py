@@ -9,7 +9,8 @@ from api.crud.order import (
     get_order_status,
     get_order_with_validation,
     get_orders,
-    get_queue,
+    get_order_queue,
+    get_restaurant_queue,
     update_order_status,
     OrderEvent,
 )
@@ -130,16 +131,26 @@ async def update_order_status_api(
 
 @router.get(
     "/{order_id}/queues",
-    description="""
-        Gets the queues of all orders in the same restaurant as the order.
-    """,
+    description="Gets the queue of the given order",
 )
-async def get_queue_api(
+async def get_order_queue_api(
     order_id: int,
     user: tuple[int, Role] = Depends(get_user),
     state: State = Depends(get_state),
 ) -> Queue:
-    return await get_queue(state, user[0], user[1], order_id)
+    return await get_order_queue(state, user[0], user[1], order_id)
+
+
+@router.get(
+    "/queues",
+    description="""
+        Gets the queue of the restaurant that the customer must be waiting
+    """,
+)
+async def get_restaurant_queue_api(
+    restaurant_id: int, state: State = Depends(get_state)
+) -> Queue:
+    return await get_restaurant_queue(state, restaurant_id)
 
 
 @router.get(
