@@ -17,5 +17,3 @@ app.include_router(customer.router)
 app.include_router(merchant.router)
 app.include_router(restaurant.router)
 app.include_router(order.router)
-
-app.webhooks
