@@ -1,4 +1,5 @@
-from fastapi import UploadFile
+import logging
+from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from api.crud.merchant import get_merchant
@@ -12,6 +13,8 @@ from api.schemas.restaurant import (
     RestaurantCreate,
 )
 from api.state import State
+from api.schemas.customer import CustomerReview as CustomerReviewSchema
+from api.models.customer import CustomerReview
 
 import os
 
@@ -47,7 +50,6 @@ async def create_restaurant(
     state.session.commit()
 
     state.session.refresh(new_restaurant)
-
     return new_restaurant.id  # type:ignore
 
 
@@ -119,54 +121,58 @@ async def create_menu(
 ) -> int:
     """Create a new menu for a restaurant."""
     # check if the price is valid
-    if menu.price < 0:
-        raise InvalidArgumentError("price can't be negative")
+    try: 
+        if menu.price < 0:
+            raise InvalidArgumentError("price can't be negative")
 
-    if menu.estimated_prep_time is not None and menu.estimated_prep_time < 0:
-        raise InvalidArgumentError("estimated prep time can't be negative")
+        if menu.estimated_prep_time is not None and menu.estimated_prep_time < 0:
+            raise InvalidArgumentError("estimated prep time can't be negative")
 
-    # check if the restaurant exists
-    restaurant = (
-        state.session.query(Restaurant)
-        .filter(Restaurant.id == restaurant_id)
-        .first()
-    )
-
-    if not restaurant:
-        raise NotFoundError("restaurant not found")
-
-    # check if the merchant owns the restaurant
-    if restaurant.merchant_id != merchant_id:  # type:ignore
-        raise UnauthorizedError("merchant does not own the restaurant")
-
-    # check if the menu with the same name in this restaurant exists
-    existing_menu = (
-        state.session.query(Menu)
-        .filter(
-            (Menu.name == menu.name) & (Menu.restaurant_id == restaurant_id)
-        )
-        .first()
-    )
-
-    if existing_menu:
-        raise ConflictingError(
-            "a menu with the same name already exists in this restaurant"
+        # check if the restaurant exists
+        restaurant = (
+            state.session.query(Restaurant)
+            .filter(Restaurant.id == restaurant_id)
+            .first()
         )
 
-    new_menu = Menu(
-        name=menu.name,
-        description=menu.description,
-        price=menu.price,
-        estimated_prep_time=menu.estimated_prep_time,
-        restaurant_id=restaurant_id,
-    )
+        if not restaurant:
+            raise NotFoundError("restaurant not found")
 
-    state.session.add(new_menu)
-    state.session.commit()
+        # check if the merchant owns the restaurant
+        if restaurant.merchant_id != merchant_id:  # type:ignore
+            raise UnauthorizedError("merchant does not own the restaurant")
 
-    state.session.refresh(new_menu)
+        # check if the menu with the same name in this restaurant exists
+        existing_menu = (
+            state.session.query(Menu)
+            .filter(
+                (Menu.name == menu.name) & (Menu.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
 
-    return new_menu.id  # type:ignore
+        if existing_menu:
+            raise ConflictingError(
+                "a menu with the same name already exists in this restaurant"
+            )
+
+        new_menu = Menu(
+            name=menu.name,
+            description=menu.description,
+            price=menu.price,
+            estimated_prep_time=menu.estimated_prep_time,
+            restaurant_id=restaurant_id,
+        )
+
+        state.session.add(new_menu)
+        state.session.commit()
+
+        state.session.refresh(new_menu)
+
+        return new_menu.id  # type:ignore
+    except Exception as e: 
+        logging.error(f"Error creating menu: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create menu.")
 
 
 async def get_menu(state: State, menu_id: int) -> Menu:
@@ -320,3 +326,22 @@ async def get_menu_customizations(
     )
 
     return customizations
+
+
+async def get_restaurant_reviews(
+    restaurant_id: int, 
+    state: State) -> list[CustomerReviewSchema]: 
+     
+    try: 
+        reviews = (
+            state.session.query(CustomerReview)
+            .filter(CustomerReview.restaurant_id == restaurant_id)
+            .all()
+        )
+        if reviews is None: 
+            raise NotFoundError("restaurant with the ID is not found or has no reviews")
+        return [CustomerReviewSchema.model_validate(review) for review in reviews]
+    except Exception as e:
+        logging.error(f"Error getting restaurant reviews: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get restaurant reviews.")
+        

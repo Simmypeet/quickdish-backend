@@ -61,13 +61,11 @@ class Option(OptionBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class CustomizationBase(BaseModel):
     title: str
     description: str | None
     unique: bool
     required: bool
-
 
 class CustomizationCreate(CustomizationBase):
     """Used for creating a new customization for a menu item."""

@@ -437,7 +437,6 @@ async def get_order_with_validation(
     order_id: int,
 ) -> Order:
     order = state.session.query(Order).filter(Order.id == order_id).first()
-
     if not order:
         raise NotFoundError("order with id {order_id} not found")
 

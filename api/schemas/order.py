@@ -167,5 +167,4 @@ class Order(OrderBase):
     status: OrderStatus
     price_paid: Decimal
     ordered_at: int
-
     model_config = ConfigDict(from_attributes=True)

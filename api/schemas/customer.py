@@ -1,5 +1,6 @@
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
-
+from datetime import datetime
 
 class CustomerBase(BaseModel):
     first_name: str
@@ -22,4 +23,27 @@ class Customer(CustomerBase):
 
     id: int
 
+    model_config = ConfigDict(from_attributes=True)
+
+#customer review
+class CustomerReviewBase(BaseModel): 
+    restaurant_id: int
+    menu_id: int
+    
+class CustomerReviewCreate(CustomerReviewBase):
+    review: str
+    tastiness: int
+    hygiene: int
+    quickness: int
+    
+class CustomerReview(CustomerReviewBase):
+    # id: Optional[int]
+    id: Optional[int]
+    customer_id: int
+    review: str
+    tastiness: int
+    hygiene: int
+    quickness: int
+    created_at: datetime
+    
     model_config = ConfigDict(from_attributes=True)

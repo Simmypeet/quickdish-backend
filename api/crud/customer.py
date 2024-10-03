@@ -1,15 +1,21 @@
+import logging
 from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
 from api.state import State
-from api.models.customer import Customer
+from api.models.customer import Customer, CustomerReview
 from api.schemas.customer import (
     CustomerLogin,
     CustomerRegister,
+    CustomerReview as CustomerReviewSchema, 
+    CustomerReviewCreate
 )
-
+from fastapi import HTTPException
+from typing import List
 import hashlib
-import datetime
+# import datetime
+from datetime import datetime, timedelta
+
 
 
 async def register_customer(
@@ -49,7 +55,7 @@ async def register_customer(
     state.session.refresh(new_customer)
 
     token = state.encode_jwt(
-        {"customer_id": new_customer.id}, datetime.timedelta(days=5)
+        {"customer_id": new_customer.id}, timedelta(days=5)
     )
 
     return AuthenticationResponse(
@@ -57,32 +63,63 @@ async def register_customer(
     )
 
 
+# async def login_customer(
+#     state: State, customer_login: CustomerLogin
+# ) -> AuthenticationResponse:
+#     """Authenticate a customer and return a JWT token."""
+#     customer = (
+#         state.session.query(Customer)
+#         .filter(Customer.username == customer_login.username)
+#         .first()
+#     )
+
+#     if not customer:
+#         raise AuthenticationError("invalid username or password")
+
+#     salted_password = customer_login.password + customer.salt
+#     hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
+
+#     if hashsed_password != customer.hashed_password:
+#         raise AuthenticationError("invalid username or password")
+
+#     token = state.encode_jwt(
+#         {"customer_id": customer.id}, datetime.timedelta(days=5)
+#     )
+
+#     return AuthenticationResponse(
+#         jwt_token=token, id=customer.id  # type: ignore
+#     )
+
 async def login_customer(
     state: State, customer_login: CustomerLogin
 ) -> AuthenticationResponse:
     """Authenticate a customer and return a JWT token."""
-    customer = (
-        state.session.query(Customer)
-        .filter(Customer.username == customer_login.username)
-        .first()
-    )
+    try: 
+        customer = (
+            state.session.query(Customer)
+            .filter(Customer.username == customer_login.username)
+            .first()
+        )
 
-    if not customer:
-        raise AuthenticationError("invalid username or password")
+        if not customer:
+            raise AuthenticationError("invalid username or password")
 
-    salted_password = customer_login.password + customer.salt
-    hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
+        salted_password = customer_login.password + customer.salt
+        hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
 
-    if hashsed_password != customer.hashed_password:
-        raise AuthenticationError("invalid username or password")
+        if hashsed_password != customer.hashed_password:
+            raise AuthenticationError("invalid username or password")
 
-    token = state.encode_jwt(
-        {"customer_id": customer.id}, datetime.timedelta(days=5)
-    )
+        token = state.encode_jwt(
+            {"customer_id": customer.id}, timedelta(days=5)
+        )
 
-    return AuthenticationResponse(
-        jwt_token=token, id=customer.id  # type: ignore
-    )
+        return AuthenticationResponse(
+            jwt_token=token, id=customer.id  # type: ignore
+        )
+    except Exception as e:
+        logging.error(f"Error logging in customer: {e}")
+        raise HTTPException(status_code=500, detail="Failed to login customer.")
 
 
 async def get_customer(state: State, customer_id: int) -> Customer:
@@ -97,3 +134,45 @@ async def get_customer(state: State, customer_id: int) -> Customer:
         raise NotFoundError("customer with the ID in the token is not found")
 
     return result
+
+#customer review
+async def get_customer_reviews(state: State, customer_id: int) -> List[CustomerReviewSchema]:
+    """Get a customer's reviews by their ID."""
+    try: 
+        results = (
+            state.session.query(CustomerReview)
+            .filter(CustomerReview.customer_id == customer_id)
+            .all()
+        )#result = list of sql alchemy model so needed to be converted to list of pydantic model 
+
+        if results is None:
+            raise NotFoundError("customer with the ID in the token is not found")
+        return [CustomerReviewSchema.model_validate(review) for review in results]
+    except Exception as e: 
+        logging.error(f"Error getting customer reviews: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get customer reviews.")
+
+
+async def create_customer_review(state: State, customerID: int , reviewDetail: CustomerReviewCreate) -> int:
+    try: 
+        sql_review = CustomerReview(
+            customer_id = customerID,
+            restaurant_id = reviewDetail.restaurant_id,
+            menu_id = reviewDetail.menu_id,
+            review = reviewDetail.review,
+            tastiness = reviewDetail.tastiness,
+            hygiene = reviewDetail.hygiene,
+            quickness = reviewDetail.quickness,
+            created_at = datetime.now()
+        )
+        state.session.add(sql_review)
+        state.session.flush()
+        state.session.commit()
+        
+        return sql_review.id
+    
+    except Exception as e:
+        state.session.rollback()  # Rollback in case of any error
+        logging.error(f"Error creating customer review: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create customer review.")
+    
