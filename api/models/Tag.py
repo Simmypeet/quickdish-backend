@@ -4,6 +4,7 @@ from sqlalchemy import ForeignKey
 from api.models.restaurant import Restaurant
 
 
+
 class Tag(Base): 
     __tablename__ = "tags"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -14,8 +15,9 @@ class RestaurantTag(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     
     tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id"))
-    tag = relationship(Tag, backref="tags")
+    # tag = relationship(Tag, backref="tags")
     
     restaurant_id: Mapped[int] = mapped_column(ForeignKey("restaurants.id"))
-    restaurant = relationship(Restaurant, backref="restaurant_tags")
+    # restaurant = relationship(Restaurant, backref="restaurant_tags")
+    
     
