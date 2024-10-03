@@ -38,8 +38,5 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Set the lower case name
-        run: REPO_NAME=`echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'`
-
       - name: Build and push the image
-        run: REPO_NAME=`echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'` & docker build . -t ghcr.io/${REPO_NAME}:latest & docker push ghcr.io/${REPO_NAME}:latest
+        run: REPO_NAME=`echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'` && docker build . -t ghcr.io/${REPO_NAME}:latest && docker push ghcr.io/${REPO_NAME}:latest
