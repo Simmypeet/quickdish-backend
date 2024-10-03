@@ -18,10 +18,8 @@ class Restaurant(RestaurantBase):
     """
     The schema for public restaurant data.
     """
-
     id: int
     merchant_id: int
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -49,7 +47,6 @@ class OptionBase(BaseModel):
     name: str
     description: str | None
     extra_price: Decimal | None
-
 
 class OptionCreate(OptionBase):
     pass

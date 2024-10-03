@@ -93,18 +93,12 @@ async def get_customer_reviews_by_id_api(
         Add a review for a restaurant.
     """
 )
-# async def create_customer_review_api(
-#     payload: CustomerReviewCreate,
-#     customer_id: int = Depends(get_customer_id),
-#     state: State = Depends(get_state),
-# ) -> int:
-#     return await create_customer_review(state, customer_id, payload)
+
+
 async def create_customer_review_api(
     payload: CustomerReviewCreate,
     customer_id: int = Depends(get_customer_id),
     state: State = Depends(get_state),
 )  -> int:
     review_id = await create_customer_review(state, customer_id, payload)
-    # Fetch the newly created review to return it
-    # created_review = await state.session.get(CustomerReview, review_id)
     return review_id

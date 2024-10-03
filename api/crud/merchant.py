@@ -92,3 +92,4 @@ async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
         .filter(Merchant.id == merchant_id)
         .first()
     )
+    
