@@ -12,9 +12,11 @@ from api.schemas.restaurant import (
     MenuCreate,
     RestaurantCreate,
 )
+from api.schemas.Tag import RestaurantTag as RestaurantTagSchema
 from api.state import State
 from api.schemas.customer import CustomerReview as CustomerReviewSchema
 from api.models.customer import CustomerReview
+from api.models.Tag import RestaurantTag
 
 import os
 
@@ -344,4 +346,17 @@ async def get_restaurant_reviews(
     except Exception as e:
         logging.error(f"Error getting restaurant reviews: {e}")
         raise HTTPException(status_code=500, detail="Failed to get restaurant reviews.")
+        
+async def get_restaurant_tags(
+    restaurant_id: int,
+    state: State
+) -> list[RestaurantTagSchema]:
+    tags = (
+        state.session.query(RestaurantTag)
+        .filter(RestaurantTag.restaurant_id == restaurant_id)
+        .all()
+    )
+    return [RestaurantTagSchema.model_validate(tag) for tag in tags]
+
+        
         

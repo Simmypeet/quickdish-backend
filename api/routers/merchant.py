@@ -68,3 +68,5 @@ async def get_merchant_by_id_api(
     state: State = Depends(get_state),
 ) -> Merchant:
     return await get_merchant(state, merchant_id)
+
+
