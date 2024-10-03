@@ -41,8 +41,5 @@ jobs:
       - name: Set the lower case name
         run: REPO_NAME=`echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'`
 
-      - name: Build the Docker image
-        run: docker build . -t ghcr.io/${REPO_NAME}:latest
-
-      - name: Push the Docker image
-        run: docker push ghcr.io/${REPO_NAME}:latest
+      - name: Build and push the image
+        run: REPO_NAME=`echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'` & docker build . -t ghcr.io/${REPO_NAME}:latest & docker push ghcr.io/${REPO_NAME}:latest
