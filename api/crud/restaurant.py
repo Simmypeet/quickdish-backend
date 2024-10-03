@@ -347,12 +347,16 @@ async def get_restaurant_tags(
     restaurant_id: int,
     state: State
 ) -> list[RestaurantTagSchema]:
-    tags = (
-        state.session.query(RestaurantTag)
-        .filter(RestaurantTag.restaurant_id == restaurant_id)
-        .all()
-    )
-    return [RestaurantTagSchema.model_validate(tag) for tag in tags]
+    try:
+        tags = (
+            state.session.query(RestaurantTag)
+            .filter(RestaurantTag.restaurant_id == restaurant_id)
+            .all()
+        )
+        return [RestaurantTagSchema.model_validate(tag) for tag in tags]
+    except Exception as e:
+        logging.error(f"Error getting restaurant tags: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get restaurant tags.")
 
         
         

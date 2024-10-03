@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class Tag(BaseModel):
     title: str
@@ -6,9 +6,10 @@ class Tag(BaseModel):
 class RestaurantTagCreate(BaseModel):
     tag_id: int
     restaurant_id: int
+    
 
 class RestaurantTag(RestaurantTagCreate):
-    pass
+    model_config = ConfigDict(from_attributes=True) #map attributes from ORM model to Pydantic model 
     
     
     
