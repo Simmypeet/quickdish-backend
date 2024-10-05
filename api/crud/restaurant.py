@@ -1,5 +1,4 @@
-import logging
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 from fastapi.responses import FileResponse
 
 from api.crud.merchant import get_merchant
