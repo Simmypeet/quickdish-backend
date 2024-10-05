@@ -69,19 +69,6 @@ async def get_current_customer_api(
 
 
 @router.get(
-    "/{customer_id}",
-    description="""
-        Get the public information of a user by their ID.
-    """,
-)
-async def get_customer_by_id_api(
-    customer_id: int,
-    state: State = Depends(get_state),
-) -> Customer:
-    return await get_customer(state, customer_id)
-
-
-@router.get(
     "/favorite-restaurants",
     description="""
         Get the list of favorite restaurant ids of the customer
@@ -109,6 +96,19 @@ async def add_favorite_restaurant_ids_api(
 ) -> str:
     await add_favorite_restaurant_ids(state, customer_id, restaurant_ids)
     return "success"
+
+
+@router.get(
+    "/{customer_id}",
+    description="""
+        Get the public information of a user by their ID.
+    """,
+)
+async def get_customer_by_id_api(
+    customer_id: int,
+    state: State = Depends(get_state),
+) -> Customer:
+    return await get_customer(state, customer_id)
 
 
 # customer review
