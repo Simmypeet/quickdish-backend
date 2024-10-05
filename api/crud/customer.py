@@ -137,6 +137,8 @@ async def add_favorite_restaurant_ids(
     if not customer:
         raise NotFoundError("customer not found")
 
+    seen: set[int] = set()
+
     for restaurant_id in restaurant_ids:
         existing_favorite = (
             state.session.query(FavoriteRestaurant)
@@ -146,6 +148,13 @@ async def add_favorite_restaurant_ids(
             )
             .first()
         )
+
+        if restaurant_id in seen:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} is duplicated in the request"
+            )
+
+        seen.add(restaurant_id)
 
         if existing_favorite:
             raise ConflictingError(
@@ -161,10 +170,10 @@ async def add_favorite_restaurant_ids(
         if not restaurant:
             raise NotFoundError(f"restaurant id {restaurant_id} not found")
 
+    for restaurant_id in restaurant_ids:
         new_favorite = FavoriteRestaurant(
             customer_id=customer_id, restaurant_id=restaurant_id
         )
-
         state.session.add(new_favorite)
 
     state.session.commit()
