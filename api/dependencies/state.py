@@ -1,16 +1,16 @@
-# State dependency
+from typing import Generator
+from fastapi import Depends
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api.state import State
 
 
-_state: None | State = None
+def get_state(
+    configuration: Configuration = Depends(get_configuration),
+) -> Generator[State, None, None]:
+    session = configuration.create_session()
 
-
-def get_state() -> State:
-    """Use this dependency to get the `State` object"""
-
-    global _state
-
-    if _state is None:
-        _state = State()
-
-    return _state
+    try:
+        yield State(session=session)
+    finally:
+        session.close()

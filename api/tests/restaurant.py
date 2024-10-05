@@ -2,15 +2,15 @@ import os
 from typing import Any
 from fastapi.testclient import TestClient
 
-from api.dependencies.state import get_state
-from api.state import State
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api import app
 
 import jwt
 
 
-def test_restaurant(state_fixture: State):
-    app.dependency_overrides[get_state] = lambda: state_fixture
+def test_restaurant(configuration_fixture: Configuration):
+    app.dependency_overrides[get_configuration] = lambda: configuration_fixture
     test_client = TestClient(app)
 
     response = test_client.post(
@@ -28,7 +28,7 @@ def test_restaurant(state_fixture: State):
 
     merchant_id = jwt.decode(  # type:ignore
         response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
     merchant_token = response.json()["jwt_token"]

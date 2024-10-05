@@ -2,6 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
+from api.configuration import Configuration
 from api.crud.customer import (
     add_favorite_restaurant_ids,
     get_customer,
@@ -11,6 +12,7 @@ from api.crud.customer import (
     get_customer_reviews,
     create_customer_review,
 )
+from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
 from api.schemas.authentication import AuthenticationResponse
@@ -39,8 +41,9 @@ router = APIRouter(
 async def register_customer_api(
     payload: CustomerRegister,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
 ) -> AuthenticationResponse:
-    return await register_customer(state, payload)
+    return await register_customer(state, configuration, payload)
 
 
 @router.post(
@@ -50,8 +53,9 @@ async def register_customer_api(
 async def login_customer_api(
     payload: CustomerLogin,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
 ) -> AuthenticationResponse:
-    return await login_customer(state, payload)
+    return await login_customer(state, configuration, payload)
 
 
 @router.get(
