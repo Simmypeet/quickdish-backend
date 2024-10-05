@@ -1,15 +1,15 @@
 from copy import deepcopy
 from typing import Any
 from fastapi.testclient import TestClient
-from api.dependencies.state import get_state
-from api.state import State
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api import app
 
 import jwt
 
 
-def test_order(state_fixture: State):
-    app.dependency_overrides[get_state] = lambda: state_fixture
+def test_order(configuration_fixture: Configuration):
+    app.dependency_overrides[get_configuration] = lambda: configuration_fixture
     test_client = TestClient(app)
 
     # create a customer
@@ -31,7 +31,7 @@ def test_order(state_fixture: State):
     ]
     first_customer_id = jwt.decode(  # type: ignore
         first_customer_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
 
@@ -53,7 +53,7 @@ def test_order(state_fixture: State):
     ]
     _second_customer_id = jwt.decode(  # type: ignore
         second_customer_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
 
@@ -77,7 +77,7 @@ def test_order(state_fixture: State):
 
     _first_merchant_id = jwt.decode(  # type: ignore
         first_merchant_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
 
@@ -100,7 +100,7 @@ def test_order(state_fixture: State):
 
     _second_merchant_id = jwt.decode(  # type: ignore
         second_merchant_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
 
@@ -588,4 +588,3 @@ def test_order(state_fixture: State):
 
     assert restaurant_queue.json()["queue_count"] == 3
     assert restaurant_queue.json()["estimated_time"] == 30
-

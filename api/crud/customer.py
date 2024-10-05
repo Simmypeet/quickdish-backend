@@ -1,3 +1,4 @@
+from api.configuration import Configuration
 from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
 from api.models.restaurant import Restaurant
@@ -18,7 +19,9 @@ from datetime import datetime, timedelta
 
 
 async def register_customer(
-    state: State, customer_create: CustomerRegister
+    state: State,
+    configuration: Configuration,
+    customer_create: CustomerRegister,
 ) -> AuthenticationResponse:
     """Create a new customer in the database."""
 
@@ -37,7 +40,9 @@ async def register_customer(
             "an account with the same username or email already exists"
         )
 
-    salt, hashed_password = state.generate_password(customer_create.password)
+    salt, hashed_password = configuration.generate_password(
+        customer_create.password
+    )
 
     new_customer = Customer(
         first_name=customer_create.first_name,
@@ -53,7 +58,7 @@ async def register_customer(
 
     state.session.refresh(new_customer)
 
-    token = state.encode_jwt(
+    token = configuration.encode_jwt(
         {"customer_id": new_customer.id}, timedelta(days=5)
     )
 
@@ -63,7 +68,7 @@ async def register_customer(
 
 
 async def login_customer(
-    state: State, customer_login: CustomerLogin
+    state: State, configuration: Configuration, customer_login: CustomerLogin
 ) -> AuthenticationResponse:
     """Authenticate a customer and return a JWT token."""
     customer = (
@@ -81,7 +86,9 @@ async def login_customer(
     if hashsed_password != customer.hashed_password:
         raise AuthenticationError("invalid username or password")
 
-    token = state.encode_jwt({"customer_id": customer.id}, timedelta(days=5))
+    token = configuration.encode_jwt(
+        {"customer_id": customer.id}, timedelta(days=5)
+    )
 
     return AuthenticationResponse(
         jwt_token=token, id=customer.id  # type: ignore

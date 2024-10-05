@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
 
+from api.configuration import Configuration
 from api.crud.restaurant import (
     create_customization,
     create_menu,
@@ -16,6 +17,7 @@ from api.crud.restaurant import (
     get_restaurant_image,
     get_restaurant_reviews,
 )
+from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
 from api.schemas.restaurant import (
@@ -79,10 +81,12 @@ async def upload_restaurant_image_api(
     restaurant_id: int,
     image: UploadFile,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
     result: int = Depends(get_merchant_id),
 ) -> str:
     await upload_restaurant_image(
         state,
+        configuration,
         restaurant_id,
         image,
         result,
@@ -184,10 +188,12 @@ async def upload_menu_image_api(
     menu_id: int,
     image: UploadFile,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
     merchant_id: int = Depends(get_merchant_id),
 ) -> str:
     await upload_menu_image(
         state,
+        configuration,
         menu_id,
         image,
         merchant_id,

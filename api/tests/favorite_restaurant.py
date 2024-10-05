@@ -1,12 +1,12 @@
 from fastapi.testclient import TestClient
 
-from api.dependencies.state import get_state
-from api.state import State
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api import app
 
 
-def test_favorites_restaurant(state_fixture: State):
-    app.dependency_overrides[get_state] = lambda: state_fixture
+def test_favorites_restaurant(configuration_fixture: Configuration):
+    app.dependency_overrides[get_configuration] = lambda: configuration_fixture
     test_client = TestClient(app)
 
     customer_register_response = test_client.post(
