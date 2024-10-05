@@ -4,8 +4,6 @@ from api.dependencies.state import get_state
 from api.state import State
 from api import app
 
-import jwt
-
 
 def test_favorites_restaurant(state_fixture: State):
     app.dependency_overrides[get_state] = lambda: state_fixture
