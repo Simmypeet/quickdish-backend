@@ -1,4 +1,3 @@
-import sys
 from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
@@ -15,11 +14,10 @@ from api.crud.restaurant import (
     upload_menu_image,
     upload_restaurant_image,
     get_restaurant_image,
-    get_restaurant_reviews
+    get_restaurant_reviews,
 )
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
-from api.errors import NotFoundError
 from api.schemas.restaurant import (
     CustomizationCreate,
     Menu,
@@ -264,12 +262,12 @@ async def get_menu_customizations_api(
         for customization in await get_menu_customizations(state, menu_id)
     ]
 
-@router.get("/reviews/{restaurant_id}", 
-        description="""Get the reviews of a restaurant by their ID."""
-)
 
+@router.get(
+    "/reviews/{restaurant_id}",
+    description="""Get the reviews of a restaurant by their ID.""",
+)
 async def get_restaurant_reviews_by_id_api(
-    restaurant_id: int,
-    state: State = Depends(get_state)
+    restaurant_id: int, state: State = Depends(get_state)
 ) -> list[CustomerReviewSchema]:
-    return await get_restaurant_reviews(restaurant_id, state) 
+    return await get_restaurant_reviews(restaurant_id, state)
