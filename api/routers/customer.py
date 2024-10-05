@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
 from api.crud.customer import (
+    add_favorite_restaurant_ids,
     get_customer,
     get_favorite_restaurant_ids,
     login_customer,
@@ -92,6 +93,22 @@ async def get_favorite_restaurant_ids_api(
     state: State = Depends(get_state),
 ) -> list[int]:
     return await get_favorite_restaurant_ids(state, customer_id)
+
+
+@router.post(
+    "/favorite-restaurants",
+    description="""
+        Add a restaurant to the user's favorite list.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def add_favorite_restaurant_ids_api(
+    restaurant_ids: list[int],
+    customer_id: int = Depends(get_customer_id),
+    state: State = Depends(get_state),
+) -> str:
+    await add_favorite_restaurant_ids(state, customer_id, restaurant_ids)
+    return "success"
 
 
 # customer review

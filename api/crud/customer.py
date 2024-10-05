@@ -1,5 +1,6 @@
 from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
+from api.models.restaurant import Restaurant
 from api.schemas.authentication import AuthenticationResponse
 from api.state import State
 from api.models.customer import Customer, CustomerReview, FavoriteRestaurant
@@ -104,6 +105,15 @@ async def get_customer(state: State, customer_id: int) -> Customer:
 async def get_favorite_restaurant_ids(
     state: State, customer_id: int
 ) -> list[int]:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
     results = (
         state.session.query(FavoriteRestaurant)
         .filter(FavoriteRestaurant.customer_id == customer_id)
@@ -111,6 +121,53 @@ async def get_favorite_restaurant_ids(
     )
 
     return [result.restaurant_id for result in results]
+
+
+async def add_favorite_restaurant_ids(
+    state: State,
+    customer_id: int,
+    restaurant_ids: list[int],
+) -> None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    for restaurant_id in restaurant_ids:
+        existing_favorite = (
+            state.session.query(FavoriteRestaurant)
+            .filter(
+                (FavoriteRestaurant.customer_id == customer_id)
+                & (FavoriteRestaurant.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
+
+        if existing_favorite:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} already exists in the favorite list"
+            )
+
+        restaurant = (
+            state.session.query(Restaurant)
+            .filter(Restaurant.id == restaurant_id)
+            .first()
+        )
+
+        if not restaurant:
+            raise NotFoundError(f"restaurant id {restaurant_id} not found")
+
+        new_favorite = FavoriteRestaurant(
+            customer_id=customer_id, restaurant_id=restaurant_id
+        )
+
+        state.session.add(new_favorite)
+
+    state.session.commit()
 
 
 # customer review
