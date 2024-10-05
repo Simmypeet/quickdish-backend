@@ -2,7 +2,7 @@ from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
 from api.state import State
-from api.models.customer import Customer, CustomerReview
+from api.models.customer import Customer, CustomerReview, FavoriteRestaurant
 from api.schemas.customer import (
     CustomerLogin,
     CustomerRegister,
@@ -99,6 +99,18 @@ async def get_customer(state: State, customer_id: int) -> Customer:
         raise NotFoundError("customer with the ID in the token is not found")
 
     return result
+
+
+async def get_favorite_restaurant_ids(
+    state: State, customer_id: int
+) -> list[int]:
+    results = (
+        state.session.query(FavoriteRestaurant)
+        .filter(FavoriteRestaurant.customer_id == customer_id)
+        .all()
+    )
+
+    return [result.restaurant_id for result in results]
 
 
 # customer review
