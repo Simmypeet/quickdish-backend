@@ -12,6 +12,7 @@ from api.crud.restaurant import (
     get_menu_image,
     get_restaurant,
     get_restaurant_menus,
+    search_restaurant,
     upload_menu_image,
     upload_restaurant_image,
     get_restaurant_image,
@@ -56,6 +57,18 @@ async def create_restaurant_api(
         result,
         restaurant,
     )
+
+
+@router.get(
+    "/search",
+    description="Get a list of restaurants from search query.",
+)
+async def search_restaurants_api(
+    query: str,
+    limit: int = 10,
+    state: State = Depends(get_state),
+) -> list[int]:
+    return await search_restaurant(query, limit, state)
 
 
 @router.get(

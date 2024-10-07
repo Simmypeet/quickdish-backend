@@ -343,3 +343,20 @@ async def get_restaurant_reviews(
     )
 
     return [CustomerReviewSchema.model_validate(review) for review in reviews]
+
+
+async def search_restaurant(query: str, limit: int, state: State) -> list[int]:
+    if limit < 1:
+        raise InvalidArgumentError("limit must be greater than 0")
+
+    restaurants = (
+        state.session.query(Restaurant)
+        .filter(
+            Restaurant.name.ilike(f"%{query}%")
+            | Restaurant.address.ilike(f"% {query}%")
+        )
+        .limit(limit)
+        .all()
+    )
+
+    return [restaurant.id for restaurant in restaurants]
