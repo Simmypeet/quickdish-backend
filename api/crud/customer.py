@@ -17,13 +17,13 @@ import hashlib
 from datetime import datetime, timedelta
 
 
-
 async def register_customer(
     state: State, customer_create: CustomerRegister
 ) -> AuthenticationResponse:
     """Create a new customer in the database."""
 
     # Check if a customer with the same username or email already exists
+    
     existing_customer = (
         state.session.query(Customer)
         .filter(
@@ -61,7 +61,7 @@ async def register_customer(
     return AuthenticationResponse(
         jwt_token=token, id=new_customer.id  # type: ignore
     )
-
+   
 
 # async def login_customer(
 #     state: State, customer_login: CustomerLogin
