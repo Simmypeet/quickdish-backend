@@ -7,7 +7,6 @@ dnspython==2.6.1
 email_validator==2.2.0
 fastapi==0.114.0
 fastapi-cli==0.0.5
--e git+https://github.com/Thun-2004/grap-backend.git@5beffef616f368f090f62802caf207d9ad8318a5#egg=grab_api
 h11==0.14.0
 httpcore==1.0.5
 httptools==0.6.1
