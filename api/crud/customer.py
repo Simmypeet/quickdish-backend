@@ -130,6 +130,52 @@ async def get_favorite_restaurant_ids(
     return [result.restaurant_id for result in results]
 
 
+async def delete_favorite_restaurant_ids(
+    state: State,
+    customer_id: int,
+    restaurant_ids: list[int],
+) -> None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    seen: set[int] = set()
+    removing_restaurants: list[FavoriteRestaurant] = []
+    for restaurant_id in restaurant_ids:
+        if restaurant_id in seen:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} is duplicated in the request"
+            )
+
+        removing_restaurant = (
+            state.session.query(FavoriteRestaurant)
+            .filter(
+                (FavoriteRestaurant.customer_id == customer_id)
+                & (FavoriteRestaurant.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
+
+        if not removing_restaurant:
+            raise NotFoundError(
+                f"restaurant id {restaurant_id} not found in the favorite list"
+            )
+
+        removing_restaurants.append(removing_restaurant)
+
+        seen.add(restaurant_id)
+
+    for restaurant in removing_restaurants:
+        state.session.delete(restaurant)
+
+    state.session.commit()
+
+
 async def add_favorite_restaurant_ids(
     state: State,
     customer_id: int,

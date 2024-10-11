@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 from api.configuration import Configuration
 from api.crud.customer import (
     add_favorite_restaurant_ids,
+    delete_favorite_restaurant_ids,
     get_customer,
     get_favorite_restaurant_ids,
     login_customer,
@@ -99,6 +100,22 @@ async def add_favorite_restaurant_ids_api(
     state: State = Depends(get_state),
 ) -> str:
     await add_favorite_restaurant_ids(state, customer_id, restaurant_ids)
+    return "success"
+
+
+@router.delete(
+    "/favorite-restaurants",
+    description="""
+        Delete restaurants from the user's favorite list.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def delete_favorite_restaurant_ids_api(
+    restaurant_ids: list[int],
+    customer_id: int = Depends(get_customer_id),
+    state: State = Depends(get_state),
+) -> str:
+    await delete_favorite_restaurant_ids(state, customer_id, restaurant_ids)
     return "success"
 
 
