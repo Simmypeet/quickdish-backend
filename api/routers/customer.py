@@ -1,8 +1,8 @@
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPBearer
 
-from api.crud.customer import get_customer, login_customer, register_customer, get_customer_reviews, create_customer_review
+from api.crud.customer import get_customer, login_customer, register_customer, get_customer_reviews, create_customer_review, refresh_access_token
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
 from api.schemas.authentication import AuthenticationResponse
@@ -13,6 +13,7 @@ from api.schemas.customer import (
     CustomerReviewCreate, 
     CustomerReview as CustomerReviewSchema
 )
+
 
 from api.state import State
 
@@ -30,10 +31,10 @@ router = APIRouter(
 )
 async def register_customer_api(
     payload: CustomerRegister,
-    state: State = Depends(get_state),
+    response: Response,
+    state: State = Depends(get_state)
 ) -> AuthenticationResponse:
-    return await register_customer(state, payload)
-
+    return await register_customer(state, payload, response)
 
 @router.post(
     "/login",
@@ -41,9 +42,23 @@ async def register_customer_api(
 )
 async def login_customer_api(
     payload: CustomerLogin,
+    response: Response,
     state: State = Depends(get_state),
 ) -> AuthenticationResponse:
-    return await login_customer(state, payload)
+    return await login_customer(state, payload, response)
+
+#refresh token 
+@router.post("/refresh", description="Refresh the access token.")
+async def refresh_token_api(
+    request: Request, #not sure what payload should be 
+    response: Response,
+    state: State = Depends(get_state)
+) -> AuthenticationResponse:
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    return await refresh_access_token(state, request, response,  refresh_token)
 
 
 @router.get(
@@ -93,7 +108,6 @@ async def get_customer_reviews_by_id_api(
         Add a review for a restaurant.
     """
 )
-
 
 async def create_customer_review_api(
     payload: CustomerReviewCreate,

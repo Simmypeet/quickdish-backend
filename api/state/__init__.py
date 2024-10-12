@@ -17,14 +17,17 @@ import string
 import secrets
 import hashlib
 
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  
+REFRESH_TOKEN_EXPIRE_DAYS = 7 
 
 class State:
     """The state of the FastAPI application. This class is used to store the
     application's configuration and dependencies."""
 
     __session: Session
-    __jwt_secret: str
+    __jwt_secret: str #access token 
     __application_data_path: str
+
 
     def __init__(
         self,
@@ -127,15 +130,14 @@ class State:
         return self.__jwt_secret
 
     def encode_jwt(
-        self, payload: dict[str, Any], token_duration: datetime.timedelta
-    ) -> str:
+        self, payload: dict[str, Any]) -> str:
         """Encode a payload into a JWT token.
 
         :param payload: The payload to encode.
         :param token_duration: The duration of the token to be valid.
         """
         exp_time = (
-            datetime.datetime.now(datetime.timezone.utc) + token_duration
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
         payload["exp"] = exp_time
@@ -145,6 +147,21 @@ class State:
             self.jwt_secret,
             algorithm="HS256",
         )
+    
+    def create_refresh_token(self, payload: dict[str, Any]) -> str: 
+        """Create a refresh token."""
+        exp_time = (
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+        
+        payload["exp"] = exp_time
+        return jwt.encode(
+            payload, 
+            self.jwt_secret, 
+            algorithm="HS256"
+        )
+
+    
 
     @property
     def application_data_path(self) -> str:
