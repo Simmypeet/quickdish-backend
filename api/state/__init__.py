@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 1  
-REFRESH_TOKEN_EXPIRE_DAYS = 7 
 
 @dataclass
 class State:
