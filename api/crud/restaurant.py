@@ -1,7 +1,7 @@
-import logging
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 from fastapi.responses import FileResponse
 
+from api.configuration import Configuration
 from api.crud.merchant import get_merchant
 from api.errors import ConflictingError, InvalidArgumentError, NotFoundError
 from api.errors.authentication import UnauthorizedError
@@ -71,7 +71,11 @@ async def get_restaurant(state: State, restaurant_id: int) -> Restaurant:
 
 
 async def upload_restaurant_image(
-    state: State, restaurant_id: int, image: UploadFile, merchant_id: int
+    state: State,
+    configuration: Configuration,
+    restaurant_id: int,
+    image: UploadFile,
+    merchant_id: int,
 ) -> str:
     """Upload an image for the restaurant."""
     restaurant = await get_restaurant(state, restaurant_id)
@@ -81,10 +85,10 @@ async def upload_restaurant_image(
 
     # Save the image
     image_directory = os.path.join(
-        state.application_data_path, "restaurants", str(restaurant_id)
+        configuration.application_data_path, "restaurants", str(restaurant_id)
     )
 
-    image_path = await state.upload_image(image, image_directory)
+    image_path = await configuration.upload_image(image, image_directory)
     restaurant.image = image_path  # type:ignore
 
     state.session.commit()
@@ -199,7 +203,11 @@ async def get_restaurant_menus(
 
 
 async def upload_menu_image(
-    state: State, menu_id: int, image: UploadFile, merchant_id: int
+    state: State,
+    configuration: Configuration,
+    menu_id: int,
+    image: UploadFile,
+    merchant_id: int,
 ) -> str:
     """Upload an image for the restaurant."""
     menu = await get_menu(state, menu_id)
@@ -209,10 +217,10 @@ async def upload_menu_image(
         raise UnauthorizedError("merchant does not own the restaurant")
 
     image_directory = os.path.join(
-        state.application_data_path, "menus", str(menu_id)
+        configuration.application_data_path, "menus", str(menu_id)
     )
 
-    image_path = await state.upload_image(image, image_directory)
+    image_path = await configuration.upload_image(image, image_directory)
 
     menu.image = image_path  # type:ignore
     state.session.commit()
@@ -327,36 +335,13 @@ async def get_menu_customizations(
 
 
 async def get_restaurant_reviews(
-    restaurant_id: int, 
-    state: State) -> list[CustomerReviewSchema]: 
-     
-    try: 
-        reviews = (
-            state.session.query(CustomerReview)
-            .filter(CustomerReview.restaurant_id == restaurant_id)
-            .all()
-        )
-        if reviews is None: 
-            raise NotFoundError("restaurant with the ID is not found or has no reviews")
-        return [CustomerReviewSchema.model_validate(review) for review in reviews]
-    except Exception as e:
-        logging.error(f"Error getting restaurant reviews: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get restaurant reviews.")
-        
-async def get_restaurant_tags(
-    restaurant_id: int,
-    state: State
-) -> list[RestaurantTagSchema]:
-    try:
-        tags = (
-            state.session.query(RestaurantTag)
-            .filter(RestaurantTag.restaurant_id == restaurant_id)
-            .all()
-        )
-        return [RestaurantTagSchema.model_validate(tag) for tag in tags]
-    except Exception as e:
-        logging.error(f"Error getting restaurant tags: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get restaurant tags.")
+    restaurant_id: int, state: State
+) -> list[CustomerReviewSchema]:
 
-        
-        
+    reviews = (
+        state.session.query(CustomerReview)
+        .filter(CustomerReview.restaurant_id == restaurant_id)
+        .all()
+    )
+
+    return [CustomerReviewSchema.model_validate(review) for review in reviews]

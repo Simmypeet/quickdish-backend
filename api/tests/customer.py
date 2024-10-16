@@ -1,16 +1,15 @@
 from fastapi.testclient import TestClient
 
 from api import app
-from api.dependencies.state import get_state
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api.models.customer import Customer
-
-from api.state import State
 
 import jwt
 
 
-def test_customer(state_fixture: State):
-    app.dependency_overrides[get_state] = lambda: state_fixture
+def test_customer(configuration_fixture: Configuration):
+    app.dependency_overrides[get_configuration] = lambda: configuration_fixture
     test_client = TestClient(app)
     register_response = test_client.post(
         "/customers/register",
@@ -26,14 +25,16 @@ def test_customer(state_fixture: State):
     assert register_response.status_code == 200
     decoded_id = jwt.decode(  # type:ignore
         register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
     assert decoded_id == register_response.json()["id"]
 
-    result = (
-        state_fixture.session.query(Customer).filter_by(id=decoded_id).first()
-    )
+    with configuration_fixture.create_session() as session:
+        result = (
+            session.query(Customer).filter_by(id=decoded_id).first()
+        )
+
 
     assert result is not None
 
@@ -65,7 +66,7 @@ def test_customer(state_fixture: State):
 
     logged_in_id = jwt.decode(  # type:ignore
         login_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
 

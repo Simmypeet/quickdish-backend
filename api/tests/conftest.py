@@ -1,9 +1,10 @@
+from typing import Generator
 from pytest_postgresql import factories  # type:ignore
 from pytest_postgresql.janitor import DatabaseJanitor
 from pytest_postgresql.executor import PostgreSQLExecutor
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from api.state import State
+from api.configuration import Configuration
 from api.models import Base
 
 import pytest
@@ -16,7 +17,9 @@ test_db = factories.postgresql_proc(port=None, dbname="test_db")  # type:ignore
 
 
 @pytest.fixture(scope="module")
-def state_fixture(test_db: PostgreSQLExecutor):
+def configuration_fixture(
+    test_db: PostgreSQLExecutor,
+) -> Generator[Configuration, None, None]:
     pg_host = test_db.host
     pg_port = test_db.port
     pg_user = test_db.user
@@ -54,4 +57,8 @@ def state_fixture(test_db: PostgreSQLExecutor):
 
             temp_dir = tempfile.TemporaryDirectory()
 
-            yield State(SessionLocal(), "mysecret", temp_dir.name)
+            yield Configuration(
+                SessionLocal,
+                "secret",
+                temp_dir.name,
+            )

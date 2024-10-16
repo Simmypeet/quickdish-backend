@@ -1,14 +1,10 @@
-from logging import error
-import logging
-import jwt
-from api.errors import ConflictingError, NotFoundError
-
+from api.configuration import Configuration
 from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
+from api.models.restaurant import Restaurant
 from api.schemas.authentication import AuthenticationResponse
-from api.state import REFRESH_TOKEN_EXPIRE_DAYS, State
-from api.models.customer import Customer, CustomerReview
-from api.models.RefreshToken import RefreshToken
+from api.state import State
+from api.models.customer import Customer, CustomerReview, FavoriteRestaurant
 from api.schemas.customer import (
     CustomerLogin,
     CustomerRegister,
@@ -25,7 +21,9 @@ from datetime import datetime, timedelta
 
 
 async def register_customer(
-    state: State, customer_create: CustomerRegister, response: Response
+    state: State,
+    configuration: Configuration,
+    customer_create: CustomerRegister,
 ) -> AuthenticationResponse:
     """Create a new customer in the database."""
 
@@ -45,7 +43,9 @@ async def register_customer(
             "an account with the same username or email already exists"
         )
 
-    salt, hashed_password = state.generate_password(customer_create.password)
+    salt, hashed_password = configuration.generate_password(
+        customer_create.password
+    )
 
     new_customer = Customer(
         first_name=customer_create.first_name,
@@ -61,8 +61,8 @@ async def register_customer(
 
     state.session.refresh(new_customer)
 
-    token = state.encode_jwt(
-        {"customer_id": new_customer.id}
+    token = configuration.encode_jwt(
+        {"customer_id": new_customer.id}, timedelta(days=5)
     )
 
     refresh_token = state.create_refresh_token(
@@ -109,7 +109,7 @@ async def register_customer(
 
 
 async def login_customer(
-    state: State, customer_login: CustomerLogin, response: Response
+    state: State, configuration: Configuration, customer_login: CustomerLogin
 ) -> AuthenticationResponse:
     """Authenticate a customer and return a JWT token."""
     try: 
@@ -224,6 +224,9 @@ def add_or_update_refresh_token(state: State, role: str, customer_id: int, refre
         state.session.rollback()
         logging.error("Error adding or updating refresh token: %s", e)
 
+    token = configuration.encode_jwt(
+        {"customer_id": customer.id}, timedelta(days=5)
+    )
 
 
 
@@ -239,6 +242,129 @@ async def get_customer(state: State, customer_id: int) -> Customer:
         raise NotFoundError("customer with the ID in the token is not found")
 
     return result
+
+
+async def get_favorite_restaurant_ids(
+    state: State, customer_id: int
+) -> list[int]:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    results = (
+        state.session.query(FavoriteRestaurant)
+        .filter(FavoriteRestaurant.customer_id == customer_id)
+        .all()
+    )
+
+    return [result.restaurant_id for result in results]
+
+
+async def delete_favorite_restaurant_ids(
+    state: State,
+    customer_id: int,
+    restaurant_ids: list[int],
+) -> None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    seen: set[int] = set()
+    removing_restaurants: list[FavoriteRestaurant] = []
+    for restaurant_id in restaurant_ids:
+        if restaurant_id in seen:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} is duplicated in the request"
+            )
+
+        removing_restaurant = (
+            state.session.query(FavoriteRestaurant)
+            .filter(
+                (FavoriteRestaurant.customer_id == customer_id)
+                & (FavoriteRestaurant.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
+
+        if not removing_restaurant:
+            raise NotFoundError(
+                f"restaurant id {restaurant_id} not found in the favorite list"
+            )
+
+        removing_restaurants.append(removing_restaurant)
+
+        seen.add(restaurant_id)
+
+    for restaurant in removing_restaurants:
+        state.session.delete(restaurant)
+
+    state.session.commit()
+
+
+async def add_favorite_restaurant_ids(
+    state: State,
+    customer_id: int,
+    restaurant_ids: list[int],
+) -> None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    seen: set[int] = set()
+
+    for restaurant_id in restaurant_ids:
+        existing_favorite = (
+            state.session.query(FavoriteRestaurant)
+            .filter(
+                (FavoriteRestaurant.customer_id == customer_id)
+                & (FavoriteRestaurant.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
+
+        if restaurant_id in seen:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} is duplicated in the request"
+            )
+
+        seen.add(restaurant_id)
+
+        if existing_favorite:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} already exists in the favorite list"
+            )
+
+        restaurant = (
+            state.session.query(Restaurant)
+            .filter(Restaurant.id == restaurant_id)
+            .first()
+        )
+
+        if not restaurant:
+            raise NotFoundError(f"restaurant id {restaurant_id} not found")
+
+    for restaurant_id in restaurant_ids:
+        new_favorite = FavoriteRestaurant(
+            customer_id=customer_id, restaurant_id=restaurant_id
+        )
+        state.session.add(new_favorite)
+
+    state.session.commit()
 
 
 # customer review

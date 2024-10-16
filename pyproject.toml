@@ -1,7 +1,7 @@
 [project]
-name = "grab-api"
+name = "quickdish-backend"
 version = "0.0.1"
-description = "grab-api"
+description = "quickdish-backend"
 dependencies = [
     'fastapi[standard]==0.114.0',
     'uvicorn[standard]==0.30.6',

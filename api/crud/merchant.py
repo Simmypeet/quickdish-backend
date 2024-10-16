@@ -1,3 +1,4 @@
+from api.configuration import Configuration
 from api.errors import ConflictingError
 from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
@@ -13,7 +14,9 @@ import datetime
 
 
 async def register_merchant(
-    state: State, merchant_register: MerchantRegister
+    state: State,
+    configuration: Configuration,
+    merchant_register: MerchantRegister,
 ) -> AuthenticationResponse:
     """Create a new merchant in the database."""
 
@@ -32,7 +35,9 @@ async def register_merchant(
             "an account with the same username or email already exists"
         )
 
-    salt, hashed_password = state.generate_password(merchant_register.password)
+    salt, hashed_password = configuration.generate_password(
+        merchant_register.password
+    )
 
     new_merchant = Merchant(
         first_name=merchant_register.first_name,
@@ -48,7 +53,7 @@ async def register_merchant(
 
     state.session.refresh(new_merchant)
 
-    token = state.encode_jwt(
+    token = configuration.encode_jwt(
         {"merchant_id": new_merchant.id}, datetime.timedelta(days=5)
     )
 
@@ -58,7 +63,7 @@ async def register_merchant(
 
 
 async def login_merchant(
-    state: State, merchant_login: MerchantLogin
+    state: State, configuration: Configuration, merchant_login: MerchantLogin
 ) -> AuthenticationResponse:
     """Authenticate a merchant and return a JWT token."""
     merchant = (
@@ -76,7 +81,7 @@ async def login_merchant(
     if hashsed_password != merchant.hashed_password:
         raise AuthenticationError("invalid username or password")
 
-    token = state.encode_jwt(
+    token = configuration.encode_jwt(
         {"merchant_id": merchant.id}, datetime.timedelta(days=5)
     )
 
