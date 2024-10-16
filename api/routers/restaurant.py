@@ -16,7 +16,7 @@ from api.crud.restaurant import (
     upload_menu_image,
     upload_restaurant_image,
     get_restaurant_image,
-    get_restaurant_reviews
+    get_restaurant_reviews,
 )
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
@@ -29,7 +29,6 @@ from api.schemas.restaurant import (
     Restaurant,
     RestaurantCreate,
 )
-from api.schemas.Tag import RestaurantTag as RestaurantTagSchema
 from api.schemas.customer import CustomerReview as CustomerReviewSchema
 from api.state import State
 
@@ -267,6 +266,7 @@ async def create_customization_api(
         merchant_id,
     )
 
+
 @router.get(
     "/menus/{menu_id}/customizations",
     description="""
@@ -289,4 +289,4 @@ async def get_menu_customizations_api(
 async def get_restaurant_reviews_by_id_api(
     restaurant_id: int, state: State = Depends(get_state)
 ) -> list[CustomerReviewSchema]:
-    return await get_restaurant_reviews(restaurant_id, state) 
+    return await get_restaurant_reviews(restaurant_id, state)
