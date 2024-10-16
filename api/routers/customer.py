@@ -14,7 +14,6 @@ from api.schemas.customer import (
     CustomerReview as CustomerReviewSchema
 )
 
-
 from api.state import State
 
 router = APIRouter(
@@ -48,17 +47,30 @@ async def login_customer_api(
     return await login_customer(state, payload, response)
 
 #refresh token 
-@router.post("/refresh", description="Refresh the access token.")
+# @router.post("/refresh", description="Refresh the access token.")
+# async def refresh_token_api(
+#     request: Request, #not sure what payload should be 
+#     response: Response,
+#     state: State = Depends(get_state)
+# ) -> AuthenticationResponse:
+#     refresh_token = request.cookies.get("refresh_token")
+#     print(refresh_token)
+#     if not refresh_token:
+#         raise HTTPException(status_code=401, detail="Invalid token")
+
+#     return await refresh_access_token(state, request)
+@router.get("/refresh", description="Refresh the access token.")
 async def refresh_token_api(
     request: Request, #not sure what payload should be 
     response: Response,
     state: State = Depends(get_state)
 ) -> AuthenticationResponse:
     refresh_token = request.cookies.get("refresh_token")
+    print(refresh_token)
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Invalid token")
-    
-    return await refresh_access_token(state, request, response,  refresh_token)
+
+    return await refresh_access_token(state, request)
 
 
 @router.get(

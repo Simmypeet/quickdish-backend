@@ -7,6 +7,7 @@ from api.errors import FileContentTypeError
 from api.errors.internal import InternalServerError
 from api.models import Base
 
+
 import alembic.config
 
 import dotenv
@@ -17,7 +18,7 @@ import string
 import secrets
 import hashlib
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  
+ACCESS_TOKEN_EXPIRE_MINUTES = 1  
 REFRESH_TOKEN_EXPIRE_DAYS = 7 
 
 class State:

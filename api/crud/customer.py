@@ -2,6 +2,8 @@ from logging import error
 import logging
 import jwt
 from api.errors import ConflictingError, NotFoundError
+
+from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
 from api.state import REFRESH_TOKEN_EXPIRE_DAYS, State
@@ -13,11 +15,10 @@ from api.schemas.customer import (
     CustomerReview as CustomerReviewSchema,
     CustomerReviewCreate,
 )
+
 from typing import List
 import hashlib
 from fastapi import HTTPException, Request, Response
-
-
 
 # import datetime
 from datetime import datetime, timedelta
@@ -74,18 +75,29 @@ async def register_customer(
         role = "user",  
         token = refresh_token,
         expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-
     )
     #add refresh token to database if not exists, if already exists, update the token
     state.session.add(stored_refresh_token)
     state.session.commit()
 
     #set refresh token in HTTP-only cookie
+    # response.set_cookie(
+    #     key="refresh_token",
+    #     value=refresh_token,
+    #     httponly=True,
+    #     secure=True,
+    #     samesite="lax",
+    #     max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
+    # )
+    response.delete_cookie(
+        "refresh_token"
+    )
+
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        httponly=True,
-        secure=True,
+        httponly=False,
+        secure=False,
         samesite="lax",
         max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
     )
@@ -124,15 +136,32 @@ async def login_customer(
         #store refresh token in database 
         add_or_update_refresh_token(state, "user", customer.id, refresh_token)
 
-        #set refresh token in HTTP-only cookie
+        # response.delete_cookie(
+        #     key="refresh_token"
+        # )
+
+        # response.set_cookie(
+        #     key="refresh_token",
+        #     value=refresh_token,
+        #     domain="localhost",
+        #     path="/", 
+        #     httponly=False, #type HTTP-only cookie
+        #     secure=False, #change to True in production: works only on HTTPS
+        #     samesite="None", #Strict = cross-site cookies are not sent on cross-site requests, Lax = cookies are sent on top-level navigations and will be sent along with GET requests initiated by third party website
+        #     max_age= timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        # )
+        
+        #work
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
-            httponly=True, #type HTTP-only cookie
+            httponly=False, #type HTTP-only cookie
             secure=False, #change to True in production: works only on HTTPS
             samesite="lax", #Strict = cross-site cookies are not sent on cross-site requests, Lax = cookies are sent on top-level navigations and will be sent along with GET requests initiated by third party website
             max_age= timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
         )
+        print("New refresh token set in cookie:", refresh_token)
+
         
         role = "user"
 
@@ -143,7 +172,7 @@ async def login_customer(
         logging.error("Error logging in customer: %s", e)
         raise AuthenticationError("invalid username or password")
 
-async def refresh_access_token(state: State, request: Request, response: Response,  refresh_token: str) -> AuthenticationResponse:
+async def refresh_access_token(state: State, request: Request) -> AuthenticationResponse:
     try: 
         # print("refresh token: ", response)
         refresh_token = request.cookies.get("refresh_token")
