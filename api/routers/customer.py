@@ -1,14 +1,16 @@
+from datetime import timedelta
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPBearer
 
-from api.configuration import Configuration
+from api.configuration import REFRESH_TOKEN_EXPIRE_DAYS, Configuration
 from api.crud.customer import (
     add_favorite_restaurant_ids,
     delete_favorite_restaurant_ids,
     get_customer,
     get_favorite_restaurant_ids,
     login_customer,
+    refresh_access_token,
     register_customer,
     get_customer_reviews,
     create_customer_review,
@@ -16,6 +18,7 @@ from api.crud.customer import (
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
+from api.errors.authentication import UnauthorizedError
 from api.schemas.authentication import AuthenticationResponse
 from api.schemas.customer import (
     CustomerLogin,
@@ -41,10 +44,27 @@ router = APIRouter(
 )
 async def register_customer_api(
     payload: CustomerRegister,
-    state: State = Depends(get_state),
+    response: Response,
     configuration: Configuration = Depends(get_configuration),
+    state: State = Depends(get_state),
 ) -> AuthenticationResponse:
-    return await register_customer(state, configuration, payload)
+    authen_access, authen_refresh = await register_customer(
+        state, configuration, payload
+    )
+
+    response.delete_cookie("refresh_token")
+    response.set_cookie(
+        key="refresh_token",
+        value=authen_refresh,
+        httponly=False,
+        secure=False,
+        samesite="lax",
+        max_age=int(
+            timedelta(REFRESH_TOKEN_EXPIRE_DAYS).total_seconds() * 1000
+        ),
+    )
+
+    return authen_access
 
 
 @router.post(
@@ -53,10 +73,57 @@ async def register_customer_api(
 )
 async def login_customer_api(
     payload: CustomerLogin,
+    response: Response,
     state: State = Depends(get_state),
     configuration: Configuration = Depends(get_configuration),
 ) -> AuthenticationResponse:
-    return await login_customer(state, configuration, payload)
+    authen_access, authen_refresh = await login_customer(
+        state, configuration, payload
+    )
+
+    response.delete_cookie("refresh_token")
+    response.set_cookie(
+        key="refresh_token",
+        value=authen_refresh,
+        httponly=False,
+        secure=False,
+        samesite="lax",
+        max_age=int(
+            timedelta(REFRESH_TOKEN_EXPIRE_DAYS).total_seconds() * 1000
+        ),
+    )
+
+    return authen_access
+
+
+@router.get("/refresh", description="Refresh the access token.")
+async def refresh_token_api(
+    request: Request,  # not sure what payload should be
+    response: Response,
+    configuration: Configuration = Depends(get_configuration),
+    state: State = Depends(get_state),
+) -> AuthenticationResponse:
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise UnauthorizedError("refresh token not found")
+
+    authen_access, authen_refresh = await refresh_access_token(
+        state, configuration, request
+    )
+
+    response.delete_cookie("refresh_token")
+    response.set_cookie(
+        key="refresh_token",
+        value=authen_refresh,
+        httponly=False,
+        secure=False,
+        samesite="lax",
+        max_age=int(
+            timedelta(REFRESH_TOKEN_EXPIRE_DAYS).total_seconds() * 1000
+        ),
+    )
+
+    return authen_access
 
 
 @router.get(
@@ -151,18 +218,10 @@ async def get_customer_reviews_by_id_api(
         Add a review for a restaurant.
     """,
 )
-# async def create_customer_review_api(
-#     payload: CustomerReviewCreate,
-#     customer_id: int = Depends(get_customer_id),
-#     state: State = Depends(get_state),
-# ) -> int:
-#     return await create_customer_review(state, customer_id, payload)
 async def create_customer_review_api(
     payload: CustomerReviewCreate,
     customer_id: int = Depends(get_customer_id),
     state: State = Depends(get_state),
 ) -> int:
     review_id = await create_customer_review(state, customer_id, payload)
-    # Fetch the newly created review to return it
-    # created_review = await state.session.get(CustomerReview, review_id)
     return review_id

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from threading import Lock
 
-from sqlalchemy import ColumnElement, false, or_
+from sqlalchemy import ColumnElement, false, or_ 
 from api.crud.restaurant import get_restaurant
 from api.dependencies.id import Role
 from api.errors import InvalidArgumentError, NotFoundError

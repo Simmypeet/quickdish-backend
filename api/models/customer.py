@@ -4,8 +4,7 @@ from sqlalchemy import ForeignKey, PrimaryKeyConstraint
 from datetime import datetime
 from api.models.restaurant import Restaurant, Menu
 
-# err: Menu not created
-
+#err: Menu not created
 
 class Customer(Base):
     __tablename__ = "customers"
