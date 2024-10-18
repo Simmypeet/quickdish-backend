@@ -243,6 +243,24 @@ def test_order(configuration_fixture: Configuration):
         ],
     }
 
+    restaurant_closed_response = test_client.post(
+        "/orders/",
+        json=steak_order,
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert restaurant_closed_response.status_code == 409
+    assert restaurant_closed_response.json() == {
+        "detail": {"error": "restaurant is closed"}
+    }
+
+    restaurant_open_response = test_client.put(
+        f"/restaurants/{steak_restaurant_id}/open",
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert restaurant_open_response.status_code == 200
+
     first_order_response = test_client.post(
         "/orders/",
         json=steak_order,
@@ -250,6 +268,13 @@ def test_order(configuration_fixture: Configuration):
     )
 
     assert first_order_response.status_code == 200
+
+    restaurant_open_response = test_client.put(
+        f"/restaurants/{burger_restaurant_id}/open",
+        headers={"Authorization": f"Bearer {second_merchant_jwt}"},
+    )
+
+    assert restaurant_open_response.status_code == 200
 
     burger_order: dict[Any, Any] = {
         "restaurant_id": burger_restaurant_id,

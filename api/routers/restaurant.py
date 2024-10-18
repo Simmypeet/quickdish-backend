@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer
 
 from api.configuration import Configuration
 from api.crud.restaurant import (
+    close_restaurant,
     create_customization,
     create_menu,
     create_restaurant,
@@ -12,6 +13,7 @@ from api.crud.restaurant import (
     get_menu_image,
     get_restaurant,
     get_restaurant_menus,
+    open_restaurant,
     search_restaurant,
     upload_menu_image,
     upload_restaurant_image,
@@ -80,6 +82,42 @@ async def get_restaurant_api(
     state: State = Depends(get_state),
 ) -> Restaurant:
     return await get_restaurant(state, restaurant_id)
+
+
+@router.put(
+    "/{restaurant_id}/open",
+    description="""
+        Open the restaurant. This endpoint requires the merchant to be
+        authenticated.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def open_restaurant_api(
+    restaurant_id: int,
+    merchant_id: int = Depends(get_merchant_id),
+    state: State = Depends(get_state),
+) -> str:
+    await open_restaurant(state, restaurant_id, merchant_id)
+
+    return "restaurant opened"
+
+
+@router.put(
+    "/{restaurant_id}/close",
+    description="""
+        Close the restaurant. This endpoint requires the merchant to be
+        authenticated.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def close_restaurant_api(
+    restaurant_id: int,
+    merchant_id: int = Depends(get_merchant_id),
+    state: State = Depends(get_state),
+) -> str:
+    await close_restaurant(state, restaurant_id, merchant_id)
+
+    return "restaurant closed"
 
 
 @router.put(
