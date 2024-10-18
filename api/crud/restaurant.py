@@ -44,6 +44,7 @@ async def create_restaurant(
         address=restaurant_create.address,
         location=restaurant_create.location,
         merchant_id=merchant_id,
+        open=False,
     )
 
     state.session.add(new_restaurant)
