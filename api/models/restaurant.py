@@ -14,7 +14,7 @@ class Restaurant(Base):
     name: Mapped[str] = mapped_column(unique=True)
     address: Mapped[str]
     merchant_id: Mapped[int] = mapped_column(ForeignKey("merchants.id"))
-    image: Mapped[str]
+    image: Mapped[str | None]
     location: Mapped[Point] = mapped_column(PointType)
 
 

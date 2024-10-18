@@ -21,7 +21,7 @@ class OrderItem(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     menu_id: Mapped[int] = mapped_column(ForeignKey("menus.id"))
     quantity: Mapped[int]
-    extra_requests: Mapped[str]
+    extra_requests: Mapped[str | None]
 
     options: Mapped[list[OrderOption]] = relationship(
         OrderOption, backref="order_item"
