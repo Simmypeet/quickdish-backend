@@ -6,7 +6,7 @@ from api.errors import ConflictingError, NotFoundError
 from api.errors import ConflictingError, NotFoundError
 from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
-from api.state import REFRESH_TOKEN_EXPIRE_DAYS, State
+from api.state import REFRESH_TOKEN_EXPIRE_DAYS, REFRESH_TOKEN_EXPIRE_SECOND, State
 from api.models.customer import Customer, CustomerReview
 from api.models.RefreshToken import RefreshToken
 from api.schemas.customer import (
@@ -22,7 +22,6 @@ from fastapi import HTTPException, Request, Response
 
 # import datetime
 from datetime import datetime, timedelta
-
 
 async def register_customer(
     state: State, customer_create: CustomerRegister, response: Response
@@ -75,6 +74,7 @@ async def register_customer(
         role = "user",  
         token = refresh_token,
         expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        # expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
     )
     #add refresh token to database if not exists, if already exists, update the token
     state.session.add(stored_refresh_token)
@@ -99,7 +99,8 @@ async def register_customer(
         httponly=False,
         secure=False,
         samesite="lax",
-        max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
+        max_age=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        # max_age = timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
     )
     
     role = "user"
@@ -135,21 +136,6 @@ async def login_customer(
 
         #store refresh token in database 
         add_or_update_refresh_token(state, "user", customer.id, refresh_token)
-
-        # response.delete_cookie(
-        #     key="refresh_token"
-        # )
-
-        # response.set_cookie(
-        #     key="refresh_token",
-        #     value=refresh_token,
-        #     domain="localhost",
-        #     path="/", 
-        #     httponly=False, #type HTTP-only cookie
-        #     secure=False, #change to True in production: works only on HTTPS
-        #     samesite="None", #Strict = cross-site cookies are not sent on cross-site requests, Lax = cookies are sent on top-level navigations and will be sent along with GET requests initiated by third party website
-        #     max_age= timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-        # )
         
         #work
         response.set_cookie(
@@ -159,6 +145,7 @@ async def login_customer(
             secure=False, #change to True in production: works only on HTTPS
             samesite="lax", #Strict = cross-site cookies are not sent on cross-site requests, Lax = cookies are sent on top-level navigations and will be sent along with GET requests initiated by third party website
             max_age= timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+            # max_age = timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
         )
         print("New refresh token set in cookie:", refresh_token)
 
@@ -179,7 +166,7 @@ async def refresh_access_token(state: State, request: Request) -> Authentication
 
         if not refresh_token:
             raise HTTPException(status_code=401, detail="Refresh token missing")
-        
+
         refresh_token_pair = state.session.query(RefreshToken).filter(RefreshToken.token == refresh_token).first()
         customer_id = refresh_token_pair.customer_id
         customer = state.session.query(Customer).filter(Customer.id == customer_id).first()
@@ -188,11 +175,14 @@ async def refresh_access_token(state: State, request: Request) -> Authentication
             raise HTTPException(status_code=402, detail="Invalid token")
 
         if refresh_token_pair.expired_at < datetime.now():
-            raise HTTPException(status_code=403, detail="Token expired")
+            raise HTTPException(status_code=405, detail="Token expired")
+            #problem : frontend should handle this like redirect to login page, if backend return exception 
         
         try:
             payload = state.encode_jwt({"customer_id": customer_id})
             return AuthenticationResponse( role="user", jwt_token=payload, id=customer_id)
+            # raise HTTPException(status_code=405, detail="Token expired")
+
         except error as e: 
             logging.error("Error encoding JWT: %s", e)
 
@@ -207,13 +197,16 @@ def add_or_update_refresh_token(state: State, role: str, customer_id: int, refre
     if existing_refresh_token: 
         existing_refresh_token.token = refresh_token
         existing_refresh_token.expired_at = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        # existing_refresh_token.expired_at = datetime.now() + timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
 
     else: 
         new_refresh_token = RefreshToken(
             customer_id = customer_id,
             role = role,
             token = refresh_token,
-            expired_at = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            expired_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            # expired_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
+
         )
         state.session.add(new_refresh_token)
 
@@ -229,16 +222,21 @@ def add_or_update_refresh_token(state: State, role: str, customer_id: int, refre
 
 async def get_customer(state: State, customer_id: int) -> Customer:
     """Get a customer by their ID."""
-    result = (
-        state.session.query(Customer)
-        .filter(Customer.id == customer_id)
-        .first()
-    )
+    try: 
+        result = (
+            state.session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
 
-    if result is None:
-        raise NotFoundError("customer with the ID in the token is not found")
+        if result is None:
+            raise NotFoundError("customer with the ID in the token is not found")
 
-    return result
+        return result
+    except Exception as e: 
+        logging.error("Error getting customer: %s", e)
+        
+
 
 
 # customer review

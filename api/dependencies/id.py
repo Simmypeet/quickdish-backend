@@ -62,7 +62,6 @@ get_merchant_id = GetID("merchant_id")
 
 class Role(Enum):
     """The user role enumeration."""
-
     CUSTOMER = 0
     MERCHANT = 1
 

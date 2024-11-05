@@ -7,7 +7,6 @@ from api.errors import FileContentTypeError
 from api.errors.internal import InternalServerError
 from api.models import Base
 
-
 import alembic.config
 
 import dotenv
@@ -18,8 +17,10 @@ import string
 import secrets
 import hashlib
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 1  
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7 
+ACCESS_TOKEN_EXPIRE_SECOND = 5
+REFRESH_TOKEN_EXPIRE_SECOND = 10
 
 class State:
     """The state of the FastAPI application. This class is used to store the
@@ -139,6 +140,7 @@ class State:
         """
         exp_time = (
             datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            # datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=ACCESS_TOKEN_EXPIRE_SECOND)
         )
 
         payload["exp"] = exp_time
@@ -153,6 +155,7 @@ class State:
         """Create a refresh token."""
         exp_time = (
             datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            # datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
         )
         
         payload["exp"] = exp_time

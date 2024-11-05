@@ -46,31 +46,32 @@ async def login_customer_api(
 ) -> AuthenticationResponse:
     return await login_customer(state, payload, response)
 
-#refresh token 
-# @router.post("/refresh", description="Refresh the access token.")
-# async def refresh_token_api(
-#     request: Request, #not sure what payload should be 
-#     response: Response,
-#     state: State = Depends(get_state)
-# ) -> AuthenticationResponse:
-#     refresh_token = request.cookies.get("refresh_token")
-#     print(refresh_token)
-#     if not refresh_token:
-#         raise HTTPException(status_code=401, detail="Invalid token")
 
-#     return await refresh_access_token(state, request)
 @router.get("/refresh", description="Refresh the access token.")
 async def refresh_token_api(
     request: Request, #not sure what payload should be 
     response: Response,
     state: State = Depends(get_state)
-) -> AuthenticationResponse:
+) -> AuthenticationResponse :
     refresh_token = request.cookies.get("refresh_token")
     print(refresh_token)
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     return await refresh_access_token(state, request)
+
+# @router.get("/refresh", description="Refresh the access token.")
+# async def refresh_token_api(
+#     request: Request, #not sure what payload should be 
+#     response: Response,
+#     state: State = Depends(get_state)
+# ) :
+#     refresh_token = request.cookies.get("refresh_token")
+#     print(refresh_token)
+#     if not refresh_token:
+#         raise HTTPException(status_code=401, detail="Invalid token")
+
+#     return await refresh_access_token(state, request)
 
 
 @router.get(
@@ -84,7 +85,11 @@ async def get_current_customer_api(
     state: State = Depends(get_state),
     result: int = Depends(get_customer_id),
 ) -> Customer:
-    return await get_customer(state, result)
+    result = get_customer(state, result)
+    if result == None:
+        raise HTTPException(status_code=401, detail="Token expired")
+    
+    return await result
 
 
 @router.get(
