@@ -19,8 +19,6 @@ allow_origins_list = allow_origins.split(",")
 allow_methods_list = allow_methods.split(",")
 allow_headers_list = allow_headers.split(",")
 
-print(allow_origins_list)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins_list,
