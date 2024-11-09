@@ -4,7 +4,7 @@ from threading import Lock
 from sqlalchemy import ColumnElement, false, or_
 from api.crud.restaurant import get_restaurant
 from api.dependencies.id import Role
-from api.errors import InvalidArgumentError, NotFoundError
+from api.errors import ConflictingError, InvalidArgumentError, NotFoundError
 from api.errors.authentication import UnauthorizedError
 from api.errors.internal import InternalServerError
 from api.models.order import (
@@ -169,6 +169,10 @@ async def create_order(
 
     # check if the restaurant exists
     restaurant = await get_restaurant(state, payload.restaurant_id)
+
+    if not restaurant.open:
+        raise ConflictingError("restaurant is closed")
+
     price_paid = Decimal(0)
     ordered_at = int(time.time())
 

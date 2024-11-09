@@ -19,6 +19,9 @@ import string
 import secrets
 import hashlib
 
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 1
+REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
 
 class Configuration:
     """
@@ -245,3 +248,14 @@ class Configuration:
             )
 
         return image_path
+
+    def create_refresh_token(self, payload: dict[str, Any]) -> str:
+        """Create a refresh token."""
+        exp_time = datetime.datetime.now(
+            datetime.timezone.utc
+        ) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+        payload["exp"] = exp_time
+        return jwt.encode(  # type:ignore
+            payload, self.jwt_secret, algorithm="HS256"
+        )

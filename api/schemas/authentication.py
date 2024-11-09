@@ -11,4 +11,3 @@ class AuthenticationResponse(BaseModel):
 
     jwt_token: str
     id: int
-

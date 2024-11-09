@@ -78,6 +78,7 @@ def test_restaurant(configuration_fixture: Configuration):
     }
     assert response.json()["merchant_id"] == merchant_id
     assert response.json()["id"] == restaurant_id
+    assert not response.json()["open"]
 
     file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.jpg")
 
@@ -330,3 +331,41 @@ def test_restaurant(configuration_fixture: Configuration):
     )
 
     assert failed_response.status_code == 403
+
+    # open restaurant
+    response = test_client.put(
+        f"/restaurants/{restaurant_id}/open",
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response = test_client.get(
+        f"/restaurants/{restaurant_id}",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["open"]
+
+    # close restaurant
+    response = test_client.put(
+        f"/restaurants/{restaurant_id}/close",
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+
+    # test unauthorized merchant
+    failed_response = test_client.put(
+        f"/restaurants/{restaurant_id}/open",
+        headers={"Authorization": f"Bearer{unauthorized_merchant_token}"},
+    )
+
+    assert failed_response.status_code == 403
+
+    response = test_client.get(
+        f"/restaurants/{restaurant_id}",
+    )
+
+    assert response.status_code == 200
+    assert not response.json()["open"]

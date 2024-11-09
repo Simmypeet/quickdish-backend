@@ -115,3 +115,42 @@ def test_favorites_restaurant(configuration_fixture: Configuration):
             "error": "restaurant id 1 already exists in the favorite list"
         }
     }
+
+    delete_non_existing_response = test_client.request(
+        "DELETE",
+        "/customers/favorite-restaurants",
+        json=[999],
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+
+    assert delete_non_existing_response.status_code == 404
+    assert delete_non_existing_response.json() == {
+        "detail": {"error": "restaurant id 999 not found in the favorite list"}
+    }
+
+    duplicating_delete_response = test_client.request(
+        "DELETE",
+        "/customers/favorite-restaurants",
+        json=[restaurant_id, restaurant_id],
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+
+    assert duplicating_delete_response.status_code == 409
+
+    delete_response = test_client.request(
+        "DELETE",
+        "/customers/favorite-restaurants",
+        json=[restaurant_id],
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == "success"
+
+    get_favorites_response = test_client.get(
+        "/customers/favorite-restaurants",
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+
+    assert get_favorites_response.status_code == 200
+    assert get_favorites_response.json() == []

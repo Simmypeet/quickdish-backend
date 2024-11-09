@@ -44,6 +44,7 @@ async def create_restaurant(
         address=restaurant_create.address,
         location=restaurant_create.location,
         merchant_id=merchant_id,
+        open=False,
     )
 
     state.session.add(new_restaurant)
@@ -66,6 +67,38 @@ async def get_restaurant(state: State, restaurant_id: int) -> Restaurant:
         raise NotFoundError("restaurant not found")
 
     return restaurant
+
+
+async def open_restaurant(
+    state: State, restaurant_id: int, merchant_id: int
+) -> None:
+    """Open a restaurant."""
+    restaurant = await get_restaurant(state, restaurant_id)
+
+    if restaurant.merchant_id != merchant_id:
+        raise UnauthorizedError("merchant does not own this restaurant")
+
+    if restaurant.open:
+        return
+
+    restaurant.open = True
+    state.session.commit()
+
+
+async def close_restaurant(
+    state: State, restaurant_id: int, merchant_id: int
+) -> None:
+    """Close a restaurant."""
+    restaurant = await get_restaurant(state, restaurant_id)
+
+    if restaurant.merchant_id != merchant_id:
+        raise UnauthorizedError("merchant does not own this restaurant")
+
+    if not restaurant.open:
+        return
+
+    restaurant.open = False
+    state.session.commit()
 
 
 async def upload_restaurant_image(
