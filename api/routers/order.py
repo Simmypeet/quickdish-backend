@@ -185,3 +185,18 @@ async def order_event_api(
             await asyncio.sleep(1)
 
     return EventSourceResponse(event_generator())
+
+
+@router.get(
+    "/{order_id}",
+    description="""
+        Gets the order information of the given order ID.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def get_order_api(
+    order_id: int,
+    user: tuple[int, Role] = Depends(get_user),
+    state: State = Depends(get_state),
+) -> Order:
+    return await get_order_with_validation(state, user[0], user[1], order_id)
