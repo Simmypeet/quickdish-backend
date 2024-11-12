@@ -579,6 +579,14 @@ def test_order(configuration_fixture: Configuration):
         get_cancelled_order_status_response.json()["reason"] == "out of stock"
     )
 
+    get_cnaclled_order_response = test_client.get(
+        f"/orders/{first_order_response.json()}/",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert get_cnaclled_order_response.status_code == 200
+    assert get_cnaclled_order_response.json()["status"]["type"] == "CANCELLED"
+
     _: int = test_client.post(
         "/orders/",
         json=steak_order,

@@ -7,6 +7,7 @@ from api.crud.order import (
     convert_to_schema,
     create_order,
     get_order_status,
+    get_order_status_no_validation,
     get_order_with_validation,
     get_orders,
     get_order_queue,
@@ -20,6 +21,7 @@ from api.errors import InvalidArgumentError
 from api.schemas.order import (
     Order,
     OrderCreate,
+    OrderItem,
     OrderStatus,
     OrderStatusFlag,
     OrderStatusUpdate,
@@ -199,4 +201,17 @@ async def get_order_api(
     user: tuple[int, Role] = Depends(get_user),
     state: State = Depends(get_state),
 ) -> Order:
-    return await get_order_with_validation(state, user[0], user[1], order_id)
+    order_model = await get_order_with_validation(
+        state, user[0], user[1], order_id
+    )
+    status = await get_order_status_no_validation(state, order_model)
+
+    return Order(
+        id=order_model.id,
+        restaurant_id=order_model.restaurant_id,
+        customer_id=order_model.customer_id,
+        items=[OrderItem.model_validate(item) for item in order_model.items],
+        status=status,
+        price_paid=order_model.price_paid,
+        ordered_at=order_model.ordered_at,
+    )
