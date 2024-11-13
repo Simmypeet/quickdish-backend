@@ -1,5 +1,7 @@
+from dataclasses import dataclass
 from decimal import Decimal
 from threading import Lock
+from typing import Sequence
 
 from sqlalchemy import ColumnElement, false, or_
 from api.crud.restaurant import get_restaurant
@@ -44,21 +46,33 @@ from api.state import State
 import time
 
 
+@dataclass
+class Notifications:
+    notifications: list[OrderNotification]
+    """List of notifications for the order."""
+
+    done: bool
+    """
+    If `True`, the order has been settled or cancelled and will no longer 
+    recieve any notifications.
+    """
+
+
 class OrderEvent:
     """
     A class used for managing order notifications.
     """
 
-    __notifications_by_order_id: dict[Order, list[OrderNotification]]
-    __state: State
+    __notifications_by_order_id: dict[int, Notifications]
     __mutex: Lock
 
-    def __init__(self, state: State) -> None:
+    def __init__(self) -> None:
         self.__notifications_by_order_id = {}
-        self.__state = state
         self.__mutex = Lock()
 
-    def register(self, order: Order) -> bool:
+    async def register(
+        self, order_id: int, user_id: int, role: Role, state: State
+    ) -> bool:
         """
         Registers the order so that it will recieve further notifications.
 
@@ -72,6 +86,10 @@ class OrderEvent:
         """
 
         with self.__mutex:
+            order = await get_order_with_validation(
+                state, user_id, role, order_id
+            )
+
             if (
                 order.status == OrderStatusFlag.SETTLED
                 or order.status == OrderStatusFlag.CANCELLED
@@ -80,13 +98,15 @@ class OrderEvent:
                     "the order is already settled or cancelled"
                 )
 
-            if order not in self.__notifications_by_order_id:
-                self.__notifications_by_order_id[order] = []
+            if order.id not in self.__notifications_by_order_id:
+                self.__notifications_by_order_id[order_id] = Notifications(
+                    [], False
+                )
                 return True
 
             return False
 
-    async def order_status_change(self, order: Order):
+    async def order_status_change(self, order: Order, state: State):
         """
         Creates a status change notification for the particular order (if
         registered). This as well creates a queue change notification for other
@@ -94,12 +114,14 @@ class OrderEvent:
         """
 
         with self.__mutex:
-            if order in self.__notifications_by_order_id:
-                self.__notifications_by_order_id[order].append(
+            if order.id in self.__notifications_by_order_id:
+                self.__notifications_by_order_id[
+                    order.id
+                ].notifications.append(
                     StatusChangeNotification(
                         order_id=order.id,
                         status=await get_order_status_no_validation(
-                            self.__state, order
+                            state, order
                         ),
                     )
                 )
@@ -110,27 +132,42 @@ class OrderEvent:
             ):
                 return
 
-            for other_order in self.__notifications_by_order_id:
-                if other_order == order:
+            if order.id in self.__notifications_by_order_id:
+                self.__notifications_by_order_id[order.id].done = True
+
+            for other_order_id in self.__notifications_by_order_id:
+                if other_order_id == order.id:
                     continue
+
+                other_order = (
+                    state.session.query(Order)
+                    .filter(Order.id == other_order_id)
+                    .first()
+                )
+
+                if not other_order:
+                    # should never happen
+                    raise InternalServerError(
+                        f"can't find the order with id {other_order_id}"
+                    )
 
                 if other_order.restaurant_id != order.restaurant_id:
                     continue
 
                 notification = QueueChangeNotification(
-                    order_id=other_order.id,
+                    order_id=other_order_id,
                     queue=await get_order_queue_no_validation(
-                        self.__state, other_order
+                        state, other_order
                     ),
                 )
 
-                self.__notifications_by_order_id[other_order].append(
-                    notification
-                )
+                self.__notifications_by_order_id[
+                    other_order_id
+                ].notifications.append(notification)
 
     async def get_notifications(
-        self, order: Order
-    ) -> list[OrderNotification] | None:
+        self, order_id: int
+    ) -> Sequence[OrderNotification] | None:
         """Gets the notifications for the particular order.
 
         Args:
@@ -146,20 +183,19 @@ class OrderEvent:
         """
 
         with self.__mutex:
-            if order not in self.__notifications_by_order_id:
+            if order_id not in self.__notifications_by_order_id:
                 return None
 
-            notifications = self.__notifications_by_order_id[order]
+            notification = self.__notifications_by_order_id[order_id]
 
-            if (
-                order.status == OrderStatusFlag.SETTLED
-                or order.status == OrderStatusFlag.CANCELLED
-            ):
-                del self.__notifications_by_order_id[order]
+            notification_list = notification.notifications
+
+            if notification.done:
+                del self.__notifications_by_order_id[order_id]
             else:
-                self.__notifications_by_order_id[order] = []
+                notification.notifications = []
 
-            return notifications
+            return notification_list
 
 
 async def create_order(
@@ -497,7 +533,7 @@ async def update_order_status(
             order.status = OrderStatusFlag.CANCELLED
 
             state.session.commit()
-            await order_event.order_status_change(order)
+            await order_event.order_status_change(order, state)
 
         case Role.CUSTOMER, OrderStatusFlag.READY, SettledOrderUpdate():
             state.session.add(
@@ -506,7 +542,7 @@ async def update_order_status(
             order.status = OrderStatusFlag.SETTLED
 
             state.session.commit()
-            await order_event.order_status_change(order)
+            await order_event.order_status_change(order, state)
 
         case Role.CUSTOMER, _, CancelledOrderUpdate():
             raise InvalidArgumentError("order can't be cancelled anymore")
@@ -528,7 +564,7 @@ async def update_order_status(
             order.status = OrderStatusFlag.PREPARING
 
             state.session.commit()
-            await order_event.order_status_change(order)
+            await order_event.order_status_change(order, state)
 
         case Role.MERCHANT, _, PreparingOrderUpdate():
             raise InvalidArgumentError("order can be prepared only once")
@@ -540,7 +576,7 @@ async def update_order_status(
             order.status = OrderStatusFlag.READY
 
             state.session.commit()
-            await order_event.order_status_change(order)
+            await order_event.order_status_change(order, state)
 
         case Role.MERCHANT, _, ReadyOrderUpdate():
             raise InvalidArgumentError(
@@ -563,7 +599,7 @@ async def update_order_status(
             order.status = OrderStatusFlag.CANCELLED
 
             state.session.commit()
-            await order_event.order_status_change(order)
+            await order_event.order_status_change(order, state)
 
         case (Role.MERCHANT, _, CancelledOrderUpdate()):
             raise InvalidArgumentError("order can't be cancelled anymore")

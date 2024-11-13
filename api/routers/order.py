@@ -171,12 +171,11 @@ async def order_event_api(
     order_event: OrderEvent = Depends(get_order_event),
     state: State = Depends(get_state),
 ) -> EventSourceResponse:
-    order = await get_order_with_validation(state, user[0], user[1], order_id)
-    order_event.register(order)
+    await order_event.register(order_id, user[0], user[1], state)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         while True:
-            notifications = await order_event.get_notifications(order)
+            notifications = await order_event.get_notifications(order_id)
 
             if notifications is None:
                 break
