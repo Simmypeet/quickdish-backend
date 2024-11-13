@@ -1,7 +1,5 @@
-from typing import AsyncGenerator
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
-from sse_starlette.sse import EventSourceResponse
 
 from api.crud.order import (
     convert_to_schema,
@@ -13,9 +11,8 @@ from api.crud.order import (
     get_order_queue,
     get_restaurant_queue,
     update_order_status,
-    OrderEvent,
 )
-from api.dependencies.order import get_order_event
+from api.dependencies.event import get_event, Event
 from api.dependencies.state import get_state
 from api.errors import InvalidArgumentError
 from api.schemas.order import (
@@ -29,8 +26,6 @@ from api.schemas.order import (
 )
 from api.dependencies.id import Role, get_customer_id, get_user
 from api.state import State
-
-import asyncio
 
 
 router = APIRouter(
@@ -121,12 +116,10 @@ async def update_order_status_api(
     order_id: int,
     status: OrderStatusUpdate,
     user: tuple[int, Role] = Depends(get_user),
-    order_event: OrderEvent = Depends(get_order_event),
+    event: Event = Depends(get_event),
     state: State = Depends(get_state),
 ) -> str:
-    await update_order_status(
-        state, order_event, user[0], user[1], order_id, status
-    )
+    await update_order_status(state, event, user[0], user[1], order_id, status)
 
     return "success"
 
@@ -153,39 +146,6 @@ async def get_restaurant_queue_api(
     restaurant_id: int, state: State = Depends(get_state)
 ) -> Queue:
     return await get_restaurant_queue(state, restaurant_id)
-
-
-@router.get(
-    "/{order_id}/events",
-    description="""
-        Returns a stream of events that are related to the order. The events are
-        in the form of JSON objects. The stream is kept open until the order is
-        settled, cancelled, or the connection is closed.
-    """,
-    dependencies=[Depends(HTTPBearer())],
-    response_class=EventSourceResponse,
-)
-async def order_event_api(
-    order_id: int,
-    user: tuple[int, Role] = Depends(get_user),
-    order_event: OrderEvent = Depends(get_order_event),
-    state: State = Depends(get_state),
-) -> EventSourceResponse:
-    await order_event.register(order_id, user[0], user[1], state)
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        while True:
-            notifications = await order_event.get_notifications(order_id)
-
-            if notifications is None:
-                break
-
-            for notification in notifications:
-                yield str(notification.model_dump_json())
-
-            await asyncio.sleep(1)
-
-    return EventSourceResponse(event_generator())
 
 
 @router.get(
