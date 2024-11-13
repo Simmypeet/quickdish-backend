@@ -1,7 +1,8 @@
 from api.models.canteen import Canteen
 from api.models.restaurant import Restaurant
 from api.state import State
-from api.schemas.canteen import CanteenBase
+from api.schemas.canteen import CanteenBase, GetCanteen
+from api.schemas.restaurant import GetRestaurant
 from fastapi.responses import FileResponse
 from api.errors import NotFoundError
 
@@ -11,21 +12,40 @@ import math
 import os
 import logging
 
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 logger = logging.getLogger(__name__)
 
 
-async def get_nearest_canteens(state: State, user_lat : float, user_long: float) -> List[CanteenBase]:
-    canteens = state.session.query(Canteen).all()
-    distance = [(index, calc_distance(c.latitude, c.longitude, user_lat, user_long)) for index, c in enumerate(canteens)]
-    sorted_distance = sorted(distance, key=lambda x: x[1], reverse=True)
-    ranks = [None] * len(canteens)
-    for ind, val in enumerate(sorted_distance):
-        ranks[ind] = val
+async def get_nearest_canteens(state: State, user_lat : float, user_long: float) -> List[GetCanteen]:
+    ranks = []
+    try:
+        canteens = state.session.query(Canteen).all()
+        distance = [(c, await calc_distance(c.latitude, c.longitude, user_lat, user_long)) for c in canteens]
+        sorted_distance = sorted(distance, key=lambda x: x[1])
+        ranks = [None] * len(canteens) 
+
+        ranks = [
+            GetCanteen(
+                id=val[0].id,
+                name = val[0].name,
+                img = val[0].img,
+                latitude = val[0].latitude,
+                longitude = val[0].longitude
+            )
+            for val in sorted_distance
+        ]
+      
+    except Exception as e:
+        logger.error(f"Error getting nearest canteens: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
     return ranks
+    
 
 async def add_canteen(state: State, payload: CanteenBase) -> Canteen:
-        
-    try: 
+    try:
         new_canteen = Canteen(
             name=payload.name,
             img="",
@@ -41,13 +61,25 @@ async def add_canteen(state: State, payload: CanteenBase) -> Canteen:
         state.session.rollback()
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-async def get_nearest_restaurants(state: State, user_lat : float, user_long: float) -> CanteenBase:
-    ranked_canteens = get_nearest_canteens(state, user_lat, user_long)
-    id = ranked_canteens[0]["id"]
-    restaurants = state.session.query(Restaurant).filter_by(id=id).all()
-    return restaurants
+async def get_nearest_restaurants(state: State, user_lat : float, user_long: float) -> List[GetRestaurant]:
+    ranked_canteens = await get_nearest_canteens(state, user_lat, user_long)
+    id = ranked_canteens[0].id
+    restaurants = state.session.query(Restaurant).filter_by(canteen_id=id).all()
+    result = [
+        GetRestaurant(
+            id=restaurant.id,
+            name=restaurant.name,
+            address=restaurant.address,
+            img=restaurant.image,
+            merchant_id=restaurant.merchant_id,
+            location=restaurant.location,
+            canteen_id=restaurant.canteen_id
+        )
+        for restaurant in restaurants
+    ]
+    return result
 
-def calc_distance(canteen_lat, canteen_long, user_lat, user_long) -> float:
+async def calc_distance(canteen_lat, canteen_long, user_lat, user_long) -> float:
     # Convert latitude and longitude from degrees to radians
     canteen_lat_rad = math.radians(canteen_lat)
     canteen_long_rad = math.radians(canteen_long)

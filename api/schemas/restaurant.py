@@ -13,6 +13,11 @@ class RestaurantBase(BaseModel):
 class RestaurantCreate(RestaurantBase):
     pass
 
+class GetRestaurant(RestaurantBase):
+    id: int
+    merchant_id: int
+    img: str
+
 
 class Restaurant(RestaurantBase):
     """

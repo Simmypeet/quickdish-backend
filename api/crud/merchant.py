@@ -16,45 +16,49 @@ async def register_merchant(
     state: State, merchant_register: MerchantRegister
 ) -> AuthenticationResponse:
     """Create a new merchant in the database."""
-
+    try: 
     # Check if a merchant with the same username or email already exists
-    existing_merchant = (
-        state.session.query(Merchant)
-        .filter(
-            (Merchant.username == merchant_register.username)
-            | (Merchant.email == merchant_register.email),
-        )
-        .first()
-    )
-
-    if existing_merchant:
-        raise ConflictingError(
-            "an account with the same username or email already exists"
+        existing_merchant = (
+            state.session.query(Merchant)
+            .filter(
+                (Merchant.username == merchant_register.username)
+                | (Merchant.email == merchant_register.email),
+            )
+            .first()
         )
 
-    salt, hashed_password = state.generate_password(merchant_register.password)
+        if existing_merchant:
+            raise ConflictingError(
+                "an account with the same username or email already exists"
+            )
 
-    new_merchant = Merchant(
-        first_name=merchant_register.first_name,
-        last_name=merchant_register.last_name,
-        username=merchant_register.username,
-        email=merchant_register.email,
-        hashed_password=hashed_password,
-        salt=salt,
-    )
+        salt, hashed_password = state.generate_password(merchant_register.password)
 
-    state.session.add(new_merchant)
-    state.session.commit()
+        new_merchant = Merchant(
+            first_name=merchant_register.first_name,
+            last_name=merchant_register.last_name,
+            username=merchant_register.username,
+            email=merchant_register.email,
+            hashed_password=hashed_password,
+            salt=salt,
+        )
 
-    state.session.refresh(new_merchant)
+        state.session.add(new_merchant)
+        state.session.commit()
 
-    token = state.encode_jwt(
-        {"merchant_id": new_merchant.id}, datetime.timedelta(days=5)
-    )
+        state.session.refresh(new_merchant)
 
-    return AuthenticationResponse(
-        jwt_token=token, id=new_merchant.id  # type:ignore
-    )
+        token = state.encode_jwt(
+            {"merchant_id": new_merchant.id}
+        )
+        role = "merchant"
+
+        return AuthenticationResponse(
+            jwt_token=token, id=new_merchant.id, role=role  # type:ignore
+        )
+    except Exception as e:
+        print(e)
+        return None
 
 
 async def login_merchant(
@@ -77,11 +81,12 @@ async def login_merchant(
         raise AuthenticationError("invalid username or password")
 
     token = state.encode_jwt(
-        {"merchant_id": merchant.id}, datetime.timedelta(days=5)
+        {"merchant_id": merchant.id}
     )
 
+    role = "merchant"
     return AuthenticationResponse(
-        jwt_token=token, id=merchant.id  # type:ignore
+        jwt_token=token, id=merchant.id, role= role  # type:ignore
     )
 
 

@@ -8,8 +8,12 @@ from api.crud.canteen import get_nearest_canteens, add_canteen, update_canteen_i
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
 from api.schemas.authentication import AuthenticationResponse
+from api.models.canteen import Canteen
+from api.models.restaurant import Restaurant
+from api.schemas.restaurant import RestaurantBase,GetRestaurant
 from api.schemas.canteen import (
-    CanteenBase
+    CanteenBase,
+    GetCanteen
 )
 
 from api.state import State
@@ -30,7 +34,7 @@ async def get_canteens_api(
     user_long: float,
     state: State = Depends(get_state),
     result: int = Depends(get_customer_id)
-) -> List[CanteenBase]:
+) -> List[GetCanteen]:
     return await get_nearest_canteens(state, user_lat, user_long)
 
 @router.post(
@@ -92,7 +96,7 @@ async def get_nearest_restaurants_api(
     user_long: float,
     state: State = Depends(get_state),
     result: int = Depends(get_customer_id)
-) -> List[CanteenBase]:
+) -> List[GetRestaurant]:
     return await get_nearest_restaurants(state, user_lat, user_long)
 
 

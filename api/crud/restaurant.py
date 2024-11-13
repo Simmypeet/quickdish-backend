@@ -25,34 +25,41 @@ async def create_restaurant(
     state: State, merchant_id: int, restaurant_create: RestaurantCreate
 ) -> int:
     # Checks if there's a restaurant with the same name
-    existing_restaurant = (
-        state.session.query(Restaurant)
-        .filter(Restaurant.name == restaurant_create.name)
-        .first()
-    )
-
-    if existing_restaurant:
-        raise ConflictingError(
-            "a restaurant with the same name already exists"
+    try:
+        existing_restaurant = (
+            state.session.query(Restaurant)
+            .filter(Restaurant.name == restaurant_create.name)
+            .first()
         )
 
-    # Check if the merchant exists
-    merchant = await get_merchant(state, merchant_id)
-    if not merchant:
-        raise NotFoundError("merchant not found")
+        if existing_restaurant:
+            raise ConflictingError(
+                "a restaurant with the same name already exists"
+            )
 
-    new_restaurant = Restaurant(
-        name=restaurant_create.name,
-        address=restaurant_create.address,
-        location=restaurant_create.location,
-        merchant_id=merchant_id,
-    )
+        # Check if the merchant exists
+        merchant = await get_merchant(state, merchant_id)
+        if not merchant:
+            raise NotFoundError("merchant not found")
 
-    state.session.add(new_restaurant)
-    state.session.commit()
+        new_restaurant = Restaurant(
+            name=restaurant_create.name,
+            address=restaurant_create.address,
+            location=restaurant_create.location,
+            merchant_id=merchant_id,
+            image="",
+            canteen_id=restaurant_create.canteen_id,
+        )
 
-    state.session.refresh(new_restaurant)
-    return new_restaurant.id  # type:ignore
+        state.session.add(new_restaurant)
+        state.session.commit()
+
+        state.session.refresh(new_restaurant)
+        return new_restaurant.id  # type:ignore
+    except Exception as e:
+        logging.error(f"Error creating restaurant: {e}")
+        state.session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create restaurant.")
 
 
 async def get_restaurant(state: State, restaurant_id: int) -> Restaurant:

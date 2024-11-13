@@ -21,92 +21,96 @@ import hashlib
 from fastapi import HTTPException, Request, Response
 
 # import datetime
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
 
 async def register_customer(
     state: State, customer_create: CustomerRegister, response: Response
 ) -> AuthenticationResponse:
     """Create a new customer in the database."""
-
-    # Check if a customer with the same username or email already exists
-    
-    existing_customer = (
-        state.session.query(Customer)
-        .filter(
-            (Customer.username == customer_create.username)
-            | (Customer.email == customer_create.email),
-        )
-        .first()
-    )
-
-    if existing_customer:
-        raise ConflictingError(
-            "an account with the same username or email already exists"
+    try: 
+        # Check if a customer with the same username or email already exists
+        
+        existing_customer = (
+            state.session.query(Customer)
+            .filter(
+                (Customer.username == customer_create.username)
+                | (Customer.email == customer_create.email),
+            )
+            .first()
         )
 
-    salt, hashed_password = state.generate_password(customer_create.password)
+        if existing_customer:
+            raise ConflictingError(
+                "an account with the same username or email already exists"
+            )
 
-    new_customer = Customer(
-        first_name=customer_create.first_name,
-        last_name=customer_create.last_name,
-        username=customer_create.username,
-        email=customer_create.email,
-        hashed_password=hashed_password,
-        salt=salt,
-    )
+        salt, hashed_password = state.generate_password(customer_create.password)
 
-    state.session.add(new_customer)
-    state.session.commit()
+        new_customer = Customer(
+            first_name=customer_create.first_name,
+            last_name=customer_create.last_name,
+            username=customer_create.username,
+            email=customer_create.email,
+            hashed_password=hashed_password,
+            salt=salt,
+        )
 
-    state.session.refresh(new_customer)
+        state.session.add(new_customer)
+        state.session.commit()
 
-    token = state.encode_jwt(
-        {"customer_id": new_customer.id}
-    )
+        state.session.refresh(new_customer)
 
-    refresh_token = state.create_refresh_token(
-        {"customer_id": new_customer.id}
-    )
+        token = state.encode_jwt(
+            {"customer_id": new_customer.id}
+        )
 
-    #store refresh token in database 
-    stored_refresh_token = RefreshToken(
-        customer_id = new_customer.id,
-        role = "user",  
-        token = refresh_token,
-        expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-        # expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
-    )
-    #add refresh token to database if not exists, if already exists, update the token
-    state.session.add(stored_refresh_token)
-    state.session.commit()
+        refresh_token = state.create_refresh_token(
+            {"customer_id": new_customer.id}
+        )
 
-    #set refresh token in HTTP-only cookie
-    # response.set_cookie(
-    #     key="refresh_token",
-    #     value=refresh_token,
-    #     httponly=True,
-    #     secure=True,
-    #     samesite="lax",
-    #     max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
-    # )
-    response.delete_cookie(
-        "refresh_token"
-    )
+        #store refresh token in database 
+        stored_refresh_token = RefreshToken(
+            customer_id = new_customer.id,
+            role = "user",  
+            token = refresh_token,
+            expired_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            # expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
+        )
+        #add refresh token to database if not exists, if already exists, update the token
+        state.session.add(stored_refresh_token)
+        state.session.commit()
 
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=False,
-        secure=False,
-        samesite="lax",
-        max_age=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-        # max_age = timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
-    )
-    
-    role = "user"
-    return AuthenticationResponse(
-        role=role, jwt_token=token, id=new_customer.id  # type: ignore
-    )
+        #set refresh token in HTTP-only cookie
+        # response.set_cookie(
+        #     key="refresh_token",
+        #     value=refresh_token,
+        #     httponly=True,
+        #     secure=True,
+        #     samesite="lax",
+        #     max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
+        # )
+        response.delete_cookie(
+            "refresh_token"
+        )
+
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=False,
+            secure=False,
+            samesite="lax",
+            max_age=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+            # max_age = timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
+        )
+        
+        role = "user"
+        return AuthenticationResponse(
+            role=role, jwt_token=token, id=new_customer.id  # type: ignore
+        )
+    except Exception as e:
+        logging.error("Error registering customer: %s", e)
+        raise AuthenticationError("error registering customer")
 
 
 async def login_customer(
@@ -204,7 +208,7 @@ def add_or_update_refresh_token(state: State, role: str, customer_id: int, refre
             customer_id = customer_id,
             role = role,
             token = refresh_token,
-            expired_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            expired_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
             # expired_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
 
         )
