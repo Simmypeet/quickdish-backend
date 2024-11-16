@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, Upload
 from fastapi.security import HTTPBearer
 from fastapi.responses import FileResponse
 
-from api.crud.canteen import get_nearest_canteens, add_canteen, update_canteen_img, get_canteen_img, get_nearest_restaurants
+from api.crud.canteen import get_nearest_canteens, add_canteen, update_canteen_img, get_canteen_img, get_nearest_restaurants, get_canteen_by_restaurant_id
 #, get_nearest_restaurants
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
@@ -74,15 +74,27 @@ async def get_canteen_img_api(
     response: Response, 
     state: State = Depends(get_state),
     result: int = Depends(get_customer_id)
-) -> FileResponse: 
+) -> FileResponse:
     image = await get_canteen_img(state, canteen_id)
 
     match image: 
         case None: 
             response.status_code = status.HTTP_204_NO_CONTENT
             return None
-        case image: 
+        case image:
             return image
+        
+@router.get(
+        "/restaurants/{restaurant_id}",
+        description="""
+            Get canteen by restaurant id
+        """ 
+)
+async def get_canteen_by_restaurant_id_api(
+    restaurant_id: int, 
+    state: State = Depends(get_state)) -> CanteenBase:
+    return await get_canteen_by_restaurant_id(state, restaurant_id)
+
         
 
 @router.get(

@@ -14,6 +14,7 @@ from api.schemas.customer import (
     CustomerRegister,
     CustomerReview as CustomerReviewSchema,
     CustomerReviewCreate,
+    CustomerUpdate
 )
 
 from typing import List
@@ -222,8 +223,6 @@ def add_or_update_refresh_token(state: State, role: str, customer_id: int, refre
         logging.error("Error adding or updating refresh token: %s", e)
 
 
-
-
 async def get_customer(state: State, customer_id: int) -> Customer:
     """Get a customer by their ID."""
     try: 
@@ -239,6 +238,42 @@ async def get_customer(state: State, customer_id: int) -> Customer:
         return result
     except Exception as e: 
         logging.error("Error getting customer: %s", e)
+
+
+async def update_customer(state: State, customer_id: int, payload: CustomerUpdate) -> Customer: 
+    try: 
+        logging.info("received customer ", payload)
+        result = (
+            state.session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+
+        if compare_password(state, payload.password, result.salt, result.hashed_password): 
+            result.username = payload.username
+            result.email = payload.email
+            if payload.new_password is not None:
+                salt, new_hashed_password = state.generate_password(payload.new_password)
+                result.hashed_password = new_hashed_password  
+                result.salt = salt
+
+            if result is None: 
+                raise NotFoundError("customer with the ID in the token is not found")
+        else: 
+            raise AuthenticationError("incorrect password")
+            
+        state.session.commit()
+        return result
+        
+    except Exception as e: 
+        logging.error("Error getting customer: %s", e)
+
+
+def compare_password(state: State, str_pw: str, salt: str, hashed_pw: str) -> bool:
+    """Compare a plain password with a hashed password. -> true = same"""
+    salted_str_pw = str_pw + salt
+    hashed_str_pw = hashlib.sha256(salted_str_pw.encode()).hexdigest()
+    return hashed_pw == hashed_str_pw
         
 
 

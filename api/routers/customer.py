@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPBearer
 
-from api.crud.customer import get_customer, login_customer, register_customer, get_customer_reviews, create_customer_review, refresh_access_token
+from api.crud.customer import get_customer, login_customer, register_customer, get_customer_reviews, create_customer_review, refresh_access_token, update_customer
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
 from api.schemas.authentication import AuthenticationResponse
@@ -11,7 +11,8 @@ from api.schemas.customer import (
     CustomerRegister,
     Customer,
     CustomerReviewCreate, 
-    CustomerReview as CustomerReviewSchema
+    CustomerReview as CustomerReviewSchema,
+    CustomerUpdate
 )
 
 from api.state import State
@@ -91,6 +92,21 @@ async def get_current_customer_api(
     
     return await result
 
+@router.post(
+    "/update", 
+    description="Update customer information"
+)
+async def update_customer_api(
+    payload: CustomerUpdate,
+    state: State = Depends(get_state), 
+    customer_id: int = Depends(get_customer_id)
+) -> Customer: 
+    result = update_customer(state, customer_id, payload)
+    print(payload)
+    if result == None: 
+        raise HTTPException(status_code=401, detail="Token expired")
+    return await result
+
 
 @router.get(
     "/{customer_id}",
@@ -107,13 +123,13 @@ async def get_customer_by_id_api(
 
 #customer review
 @router.get(
-    "/reviews/{customer_id}",
+    "/customer/reviews",
     description="""
         Get user's reviews by their ID.
     """
 )
 async def get_customer_reviews_by_id_api(
-    customer_id: int,
+    customer_id: int = Depends(get_customer_id),
     state: State = Depends(get_state)
 ) -> List[CustomerReviewSchema]:
     return await get_customer_reviews(state, customer_id)

@@ -118,5 +118,13 @@ async def get_canteen_img(state: State, canteen_id) -> FileResponse:
         return None
     return FileResponse(canteen.img) 
 
+
+async def get_canteen_by_restaurant_id(state: State, restaurant_id) -> CanteenBase:
+    restaurant = state.session.query(Restaurant).filter_by(id=restaurant_id).first()
+    if not restaurant:
+        return NotFoundError("Restaurant not found")
+    canteen = state.session.query(Canteen).filter_by(id=restaurant.canteen_id).first()
+    return canteen
+
     
 
