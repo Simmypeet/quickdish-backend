@@ -16,6 +16,7 @@ from api.schemas.customer import (
     CustomerReviewCreate,
     CustomerUpdate
 )
+from fastapi.responses import JSONResponse
 
 from typing import List
 import hashlib
@@ -240,33 +241,32 @@ async def get_customer(state: State, customer_id: int) -> Customer:
         logging.error("Error getting customer: %s", e)
 
 
-async def update_customer(state: State, customer_id: int, payload: CustomerUpdate) -> Customer: 
-    try: 
-        logging.info("received customer ", payload)
-        result = (
-            state.session.query(Customer)
-            .filter(Customer.id == customer_id)
-            .first()
-        )
+async def update_customer(state: State, customer_id: int, payload: CustomerUpdate): 
+    logging.info("received customer ", payload)
+    result = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
 
-        if compare_password(state, payload.password, result.salt, result.hashed_password): 
-            result.username = payload.username
-            result.email = payload.email
-            if payload.new_password is not None:
-                salt, new_hashed_password = state.generate_password(payload.new_password)
-                result.hashed_password = new_hashed_password  
-                result.salt = salt
+    if compare_password(state, payload.password, result.salt, result.hashed_password): 
+        result.username = payload.username
+        result.email = payload.email
+        if payload.new_password != '':
+            salt, new_hashed_password = state.generate_password(payload.new_password)
+            result.hashed_password = new_hashed_password  
+            result.salt = salt
+            state.session.commit()
+            return JSONResponse(
+                status_code=200,
+                content={"message": "Customer updated successfully"},
+            )
 
-            if result is None: 
-                raise NotFoundError("customer with the ID in the token is not found")
-        else: 
-            raise AuthenticationError("incorrect password")
-            
-        state.session.commit()
-        return result
-        
-    except Exception as e: 
-        logging.error("Error getting customer: %s", e)
+        if result is None: 
+            raise NotFoundError("customer with the ID in the token is not found")
+    else: 
+        raise HTTPException(status_code=402, detail="Unmatched password")
+  
 
 
 def compare_password(state: State, str_pw: str, salt: str, hashed_pw: str) -> bool:

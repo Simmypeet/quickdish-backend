@@ -15,6 +15,9 @@ class Customer(Base):
     email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[str]
     salt: Mapped[str]
+    profile_pic: Mapped[str]
+    userpage_pic: Mapped[str]
+    
 
 class CustomerReview(Base): 
     __tablename__ = "customer_reviews"

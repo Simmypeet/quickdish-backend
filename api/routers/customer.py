@@ -100,7 +100,7 @@ async def update_customer_api(
     payload: CustomerUpdate,
     state: State = Depends(get_state), 
     customer_id: int = Depends(get_customer_id)
-) -> Customer: 
+): 
     result = update_customer(state, customer_id, payload)
     print(payload)
     if result == None: 
