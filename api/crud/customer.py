@@ -1,5 +1,6 @@
 from logging import error
 import logging
+import os
 import jwt
 from api.errors import ConflictingError, NotFoundError
 
@@ -16,11 +17,11 @@ from api.schemas.customer import (
     CustomerReviewCreate,
     CustomerUpdate
 )
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 
 from typing import List
 import hashlib
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Request, Response, UploadFile
 
 # import datetime
 from datetime import datetime, timedelta, timezone
@@ -268,7 +269,6 @@ async def update_customer(state: State, customer_id: int, payload: CustomerUpdat
         raise HTTPException(status_code=402, detail="Unmatched password")
   
 
-
 def compare_password(state: State, str_pw: str, salt: str, hashed_pw: str) -> bool:
     """Compare a plain password with a hashed password. -> true = same"""
     salted_str_pw = str_pw + salt
@@ -276,6 +276,76 @@ def compare_password(state: State, str_pw: str, salt: str, hashed_pw: str) -> bo
     return hashed_pw == hashed_str_pw
         
 
+async def upload_profile(
+    image: UploadFile, 
+    customer_id: int,
+    state: State
+) -> str:
+    try:
+        customer =  (
+            state.session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+        image_dir = os.path.join(
+            state.application_data_path, "customers/profile", str(customer_id)
+        )
+        image_path = await state.upload_image(image, image_dir)
+        print(image_path)
+        customer.profile_pic = image_path
+        state.session.commit()
+        return image_path
+    except Exception as e:
+        logging.error("Error uploading profile image: %s", e)
+
+
+async def upload_banner(
+    image: UploadFile, 
+    customer_id: int,
+    state: State
+) ->  str:
+    customer =  (
+            state.session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+    image_dir = os.path.join(
+        state.application_data_path, "customers/banner", str(customer_id)
+    )
+    image_path = await state.upload_image(image, image_dir)
+    customer.userpage_pic = image_path
+    state.session.commit()
+    return image_path
+
+async def get_profile_img(state: State, customer_id: int) -> FileResponse: 
+    customer =  (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer: 
+        raise NotFoundError("Customer not found")
+    
+    if not customer.profile_pic:
+        return None
+    
+    return FileResponse(customer.profile_pic)
+  
+
+async def get_banner_img(state: State, customer_id: int) -> FileResponse: 
+    customer =  (
+            state.session.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+    if not customer: 
+        raise NotFoundError("Customer not found")
+    
+    if not customer.userpage_pic:
+        return None
+    
+    return FileResponse(customer.userpage_pic)
 
 
 # customer review

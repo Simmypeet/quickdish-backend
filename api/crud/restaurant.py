@@ -329,7 +329,6 @@ async def get_menu_customizations(
         .filter(Customization.menu_id == menu_id)
         .all()
     )
-
     return customizations
 
 

@@ -1,8 +1,9 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
 
-from api.crud.customer import get_customer, login_customer, register_customer, get_customer_reviews, create_customer_review, refresh_access_token, update_customer
+from api.crud.customer import get_customer, login_customer, register_customer, get_customer_reviews, create_customer_review, refresh_access_token, update_customer, upload_banner, upload_profile, get_profile_img, get_banner_img
 from api.dependencies.state import get_state
 from api.dependencies.id import get_customer_id
 from api.schemas.authentication import AuthenticationResponse
@@ -149,3 +150,95 @@ async def create_customer_review_api(
 )  -> int:
     review_id = await create_customer_review(state, customer_id, payload)
     return review_id
+
+@router.post(
+    "/upload_profile",
+    description="""
+        Upload user profile pic
+    """
+)
+async def upload_profile_api(
+    image: UploadFile, 
+    customer_id: int = Depends(get_customer_id),
+    state: State = Depends(get_state),
+) -> str:
+    return await upload_profile(image, customer_id, state)
+
+@router.post(
+    "/upload_banner",
+    description="""
+        Upload user banner pic
+    """
+)
+async def upload_banner_api(
+    image: UploadFile, 
+    customer_id: int = Depends(get_customer_id),
+    state: State = Depends(get_state),
+)  -> str:
+    return await upload_banner(image, customer_id, state)
+
+@router.get(
+    "/{customer_id}/get_profile_img",
+    description="""
+        Get user profile pic
+    """, 
+    responses={
+        204: {
+            "description": "the customer does not have profile image",
+            "content": {"application/json": {}},
+        },
+        200: {
+            "description": "The profile image",
+            "content": {
+                "image/*": {},
+            },
+        },
+    },
+    response_model=None,
+    response_class=Response,
+)
+async def get_profile_img_api(
+    response: Response,
+    customer_id: int,
+    state: State = Depends(get_state),
+)  -> FileResponse :
+    
+    image = await get_profile_img(state, customer_id)
+    match image:
+        case None:
+            response.status_code = status.HTTP_204_NO_CONTENT
+            return None
+        case image: 
+            return image
+
+
+@router.get(
+    "/{customer_id}/get_banner_img",
+    description="""
+        Get user profile pic
+    """, 
+    responses={
+        204: {
+            "description": "the customer does not have banner image",
+            "content": {"application/json": {}},
+        },
+        200: {
+            "description": "The banner image",
+            "content": {
+                "image/*": {},
+            },
+        },
+    },
+)
+async def get_banner_img_api(
+    response: Response,
+    customer_id: int,
+    state: State = Depends(get_state),
+)  -> FileResponse:
+    image = await get_banner_img(state, customer_id)
+    match image:
+        case None:
+            response.status_code = status.HTTP_204_NO_CONTENT
+            return None
+        case image: 
+            return image
