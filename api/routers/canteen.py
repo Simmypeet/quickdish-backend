@@ -73,7 +73,6 @@ async def get_canteen_img_api(
     canteen_id : int, 
     response: Response, 
     state: State = Depends(get_state),
-    result: int = Depends(get_customer_id)
 ) -> FileResponse:
     image = await get_canteen_img(state, canteen_id)
 

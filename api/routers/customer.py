@@ -162,6 +162,7 @@ async def upload_profile_api(
     customer_id: int = Depends(get_customer_id),
     state: State = Depends(get_state),
 ) -> str:
+    print("uploading profile: ", image.filename)
     return await upload_profile(image, customer_id, state)
 
 @router.post(
