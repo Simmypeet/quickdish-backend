@@ -104,12 +104,27 @@ def test_order(configuration_fixture: Configuration):
         algorithms=["HS256"],
     )["merchant_id"]
 
+    response = test_client.post(
+        "/canteens/add_canteen",
+        json={
+            "name": "Test Canteen",
+            "address": "123 Test St",
+            "latitude": 123,
+            "longitude": 123,
+        },
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert response.status_code == 200
+    canteen_id = response.json()["id"]
+
     # create a steak restaurant
     steak_restaurant_create_response = test_client.post(
         "/restaurants/",
         json={
             "name": "Steak House",
             "address": "address",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 0,
                 "lng": 0,
@@ -167,6 +182,7 @@ def test_order(configuration_fixture: Configuration):
         json={
             "name": "Burger House",
             "address": "address",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 0,
                 "lng": 0,

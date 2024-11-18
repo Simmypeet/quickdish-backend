@@ -19,7 +19,6 @@ async def register_merchant(
     merchant_register: MerchantRegister,
 ) -> AuthenticationResponse:
     """Create a new merchant in the database."""
-
     # Check if a merchant with the same username or email already exists
     existing_merchant = (
         state.session.query(Merchant)
@@ -56,9 +55,10 @@ async def register_merchant(
     token = configuration.encode_jwt(
         {"merchant_id": new_merchant.id}, datetime.timedelta(days=5)
     )
+    role = "merchant"
 
     return AuthenticationResponse(
-        jwt_token=token, id=new_merchant.id  # type:ignore
+        jwt_token=token, id=new_merchant.id, role=role  # type:ignore
     )
 
 
@@ -85,8 +85,9 @@ async def login_merchant(
         {"merchant_id": merchant.id}, datetime.timedelta(days=5)
     )
 
+    role = "merchant"
     return AuthenticationResponse(
-        jwt_token=token, id=merchant.id  # type:ignore
+        jwt_token=token, id=merchant.id, role=role  # type:ignore
     )
 
 
@@ -97,4 +98,3 @@ async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
         .filter(Merchant.id == merchant_id)
         .first()
     )
-    

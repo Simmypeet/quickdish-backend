@@ -15,6 +15,12 @@ class CustomerLogin(BaseModel):
     username: str
     password: str
 
+class CustomerUpdate(BaseModel): 
+    username: str
+    email: str
+    new_password: str
+    password: str
+
 
 class Customer(CustomerBase):
     """The schema for public customer data."""

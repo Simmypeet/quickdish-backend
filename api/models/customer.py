@@ -4,7 +4,6 @@ from sqlalchemy import ForeignKey, PrimaryKeyConstraint
 from datetime import datetime
 from api.models.restaurant import Restaurant, Menu
 
-#err: Menu not created
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -16,6 +15,8 @@ class Customer(Base):
     email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[str]
     salt: Mapped[str]
+    profile_pic: Mapped[str | None]
+    userpage_pic: Mapped[str | None]
 
 
 class CustomerReview(Base):

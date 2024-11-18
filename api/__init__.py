@@ -2,7 +2,7 @@ import os
 import dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import customer, merchant, restaurant, order, admin, event
+from api.routers import customer, merchant, restaurant, order, admin, canteen, event
 
 
 app = FastAPI()
@@ -30,6 +30,7 @@ app.add_middleware(
 app.include_router(customer.router)
 app.include_router(merchant.router)
 app.include_router(restaurant.router)
+app.include_router(canteen.router)
 app.include_router(order.router)
 app.include_router(event.router)
 app.include_router(admin.router)

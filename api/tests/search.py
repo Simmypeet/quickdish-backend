@@ -24,6 +24,20 @@ def test_search_restaurnat(configuration_fixture: Configuration):
 
     merchant_token = merchant_register_response.json()["jwt_token"]
 
+    response = test_client.post(
+        "/canteens/add_canteen",
+        json={
+            "name": "Test Canteen",
+            "address": "123 Test St",
+            "latitude": 123,
+            "longitude": 123,
+        },
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+    canteen_id = response.json()["id"]
+
     restaurant_ids: list[int] = []
 
     for i in range(20):
@@ -32,6 +46,7 @@ def test_search_restaurnat(configuration_fixture: Configuration):
             json={
                 "name": f"Test Restaurant {i}",
                 "address": f"{i} Test St",
+                "canteen_id": canteen_id,
                 "location": {
                     "lat": i,
                     "lng": i,

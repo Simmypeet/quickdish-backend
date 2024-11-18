@@ -45,6 +45,7 @@ async def create_restaurant(
         location=restaurant_create.location,
         merchant_id=merchant_id,
         open=False,
+        canteen_id=restaurant_create.canteen_id,
     )
 
     state.session.add(new_restaurant)
@@ -361,7 +362,6 @@ async def get_menu_customizations(
         .filter(Customization.menu_id == menu_id)
         .all()
     )
-
     return customizations
 
 

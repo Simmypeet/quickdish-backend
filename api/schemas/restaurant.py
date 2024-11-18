@@ -8,10 +8,15 @@ class RestaurantBase(BaseModel):
     name: str
     address: str
     location: Point
-
+    canteen_id: int
 
 class RestaurantCreate(RestaurantBase):
     pass
+
+class GetRestaurant(RestaurantBase):
+    id: int
+    merchant_id: int
+    img: str
 
 
 class Restaurant(RestaurantBase):
