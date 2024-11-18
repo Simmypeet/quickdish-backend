@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
+from api.configuration import Configuration
 from api.crud.merchant import get_merchant, login_merchant, register_merchant
+from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
 from api.schemas.authentication import AuthenticationResponse
@@ -28,8 +30,9 @@ router = APIRouter(
 async def register_merchant_api(
     payload: MerchantRegister,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
 ) -> AuthenticationResponse:
-    return await register_merchant(state, payload)
+    return await register_merchant(state, configuration, payload)
 
 
 @router.post(
@@ -39,8 +42,9 @@ async def register_merchant_api(
 async def login_merchant_api(
     payload: MerchantLogin,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
 ) -> AuthenticationResponse:
-    return await login_merchant(state, payload)
+    return await login_merchant(state, configuration, payload)
 
 
 @router.get(
@@ -48,7 +52,7 @@ async def login_merchant_api(
     dependencies=[Depends(HTTPBearer())],
     description="""
         Get the public information of the currently authenticated user.
-        """,
+    """,
 )
 async def get_current_merchant_api(
     state: State = Depends(get_state),

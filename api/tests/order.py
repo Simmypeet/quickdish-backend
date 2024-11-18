@@ -1,15 +1,15 @@
 from copy import deepcopy
 from typing import Any
 from fastapi.testclient import TestClient
-from api.dependencies.state import get_state
-from api.state import State
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api import app
 
 import jwt
 
 
-def test_order(state_fixture: State):
-    app.dependency_overrides[get_state] = lambda: state_fixture
+def test_order(configuration_fixture: Configuration):
+    app.dependency_overrides[get_configuration] = lambda: configuration_fixture
     test_client = TestClient(app)
 
     # create a customer
@@ -31,7 +31,7 @@ def test_order(state_fixture: State):
     ]
     first_customer_id = jwt.decode(  # type: ignore
         first_customer_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
 
@@ -53,7 +53,7 @@ def test_order(state_fixture: State):
     ]
     _second_customer_id = jwt.decode(  # type: ignore
         second_customer_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["customer_id"]
 
@@ -77,7 +77,7 @@ def test_order(state_fixture: State):
 
     _first_merchant_id = jwt.decode(  # type: ignore
         first_merchant_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
 
@@ -100,9 +100,23 @@ def test_order(state_fixture: State):
 
     _second_merchant_id = jwt.decode(  # type: ignore
         second_merchant_register_response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
+
+    response = test_client.post(
+        "/canteens/add_canteen",
+        json={
+            "name": "Test Canteen",
+            "address": "123 Test St",
+            "latitude": 123,
+            "longitude": 123,
+        },
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert response.status_code == 200
+    canteen_id = response.json()["id"]
 
     # create a steak restaurant
     steak_restaurant_create_response = test_client.post(
@@ -110,6 +124,7 @@ def test_order(state_fixture: State):
         json={
             "name": "Steak House",
             "address": "address",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 0,
                 "lng": 0,
@@ -167,6 +182,7 @@ def test_order(state_fixture: State):
         json={
             "name": "Burger House",
             "address": "address",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 0,
                 "lng": 0,
@@ -243,6 +259,24 @@ def test_order(state_fixture: State):
         ],
     }
 
+    restaurant_closed_response = test_client.post(
+        "/orders/",
+        json=steak_order,
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert restaurant_closed_response.status_code == 409
+    assert restaurant_closed_response.json() == {
+        "detail": {"error": "restaurant is closed"}
+    }
+
+    restaurant_open_response = test_client.put(
+        f"/restaurants/{steak_restaurant_id}/open",
+        headers={"Authorization": f"Bearer {first_merchant_jwt}"},
+    )
+
+    assert restaurant_open_response.status_code == 200
+
     first_order_response = test_client.post(
         "/orders/",
         json=steak_order,
@@ -250,6 +284,13 @@ def test_order(state_fixture: State):
     )
 
     assert first_order_response.status_code == 200
+
+    restaurant_open_response = test_client.put(
+        f"/restaurants/{burger_restaurant_id}/open",
+        headers={"Authorization": f"Bearer {second_merchant_jwt}"},
+    )
+
+    assert restaurant_open_response.status_code == 200
 
     burger_order: dict[Any, Any] = {
         "restaurant_id": burger_restaurant_id,
@@ -554,6 +595,14 @@ def test_order(state_fixture: State):
         get_cancelled_order_status_response.json()["reason"] == "out of stock"
     )
 
+    get_cnaclled_order_response = test_client.get(
+        f"/orders/{first_order_response.json()}/",
+        headers={"Authorization": f"Bearer {first_customer_jwt}"},
+    )
+
+    assert get_cnaclled_order_response.status_code == 200
+    assert get_cnaclled_order_response.json()["status"]["type"] == "CANCELLED"
+
     _: int = test_client.post(
         "/orders/",
         json=steak_order,
@@ -588,4 +637,3 @@ def test_order(state_fixture: State):
 
     assert restaurant_queue.json()["queue_count"] == 3
     assert restaurant_queue.json()["estimated_time"] == 30
-

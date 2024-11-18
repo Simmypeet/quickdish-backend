@@ -1,25 +1,24 @@
-from typing import AsyncGenerator
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
-from sse_starlette.sse import EventSourceResponse
 
 from api.crud.order import (
     convert_to_schema,
     create_order,
     get_order_status,
+    get_order_status_no_validation,
     get_order_with_validation,
     get_orders,
     get_order_queue,
     get_restaurant_queue,
     update_order_status,
-    OrderEvent,
 )
-from api.dependencies.order import get_order_event
+from api.dependencies.event import get_event, Event
 from api.dependencies.state import get_state
 from api.errors import InvalidArgumentError
 from api.schemas.order import (
     Order,
     OrderCreate,
+    OrderItem,
     OrderStatus,
     OrderStatusFlag,
     OrderStatusUpdate,
@@ -27,8 +26,6 @@ from api.schemas.order import (
 )
 from api.dependencies.id import Role, get_customer_id, get_user
 from api.state import State
-
-import asyncio
 
 
 router = APIRouter(
@@ -119,12 +116,10 @@ async def update_order_status_api(
     order_id: int,
     status: OrderStatusUpdate,
     user: tuple[int, Role] = Depends(get_user),
-    order_event: OrderEvent = Depends(get_order_event),
+    event: Event = Depends(get_event),
     state: State = Depends(get_state),
 ) -> str:
-    await update_order_status(
-        state, order_event, user[0], user[1], order_id, status
-    )
+    await update_order_status(state, event, user[0], user[1], order_id, status)
 
     return "success"
 
@@ -154,34 +149,28 @@ async def get_restaurant_queue_api(
 
 
 @router.get(
-    "/{order_id}/events",
+    "/{order_id}",
     description="""
-        Returns a stream of events that are related to the order. The events are
-        in the form of JSON objects. The stream is kept open until the order is
-        settled, cancelled, or the connection is closed.
+        Gets the order information of the given order ID.
     """,
     dependencies=[Depends(HTTPBearer())],
-    response_class=EventSourceResponse,
 )
-async def order_event_api(
+async def get_order_api(
     order_id: int,
     user: tuple[int, Role] = Depends(get_user),
-    order_event: OrderEvent = Depends(get_order_event),
     state: State = Depends(get_state),
-) -> EventSourceResponse:
-    order = await get_order_with_validation(state, user[0], user[1], order_id)
-    order_event.register(order)
+) -> Order:
+    order_model = await get_order_with_validation(
+        state, user[0], user[1], order_id
+    )
+    status = await get_order_status_no_validation(state, order_model)
 
-    async def event_generator() -> AsyncGenerator[str, None]:
-        while True:
-            notifications = await order_event.get_notifications(order)
-
-            if notifications is None:
-                break
-
-            for notification in notifications:
-                yield str(notification.model_dump_json())
-
-            await asyncio.sleep(1)
-
-    return EventSourceResponse(event_generator())
+    return Order(
+        id=order_model.id,
+        restaurant_id=order_model.restaurant_id,
+        customer_id=order_model.customer_id,
+        items=[OrderItem.model_validate(item) for item in order_model.items],
+        status=status,
+        price_paid=order_model.price_paid,
+        ordered_at=order_model.ordered_at,
+    )

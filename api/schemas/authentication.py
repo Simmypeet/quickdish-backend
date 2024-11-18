@@ -8,7 +8,6 @@ class AuthenticationResponse(BaseModel):
     The response contains the JWT token that the client can use to authenticate
     themselves in the future.
     """
-    role: str
+
     jwt_token: str
     id: int
-

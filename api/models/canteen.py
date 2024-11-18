@@ -1,8 +1,5 @@
 from api.models import Base
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey
-from datetime import datetime
-
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class Canteen(Base):
@@ -10,6 +7,6 @@ class Canteen(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
-    img: Mapped[str] 
+    img: Mapped[str]
     latitude: Mapped[float]
     longitude: Mapped[float]

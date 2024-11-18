@@ -1,3 +1,4 @@
+from api.configuration import Configuration
 from api.errors import ConflictingError
 from api.errors.authentication import AuthenticationError
 from api.schemas.authentication import AuthenticationResponse
@@ -13,56 +14,56 @@ import datetime
 
 
 async def register_merchant(
-    state: State, merchant_register: MerchantRegister
+    state: State,
+    configuration: Configuration,
+    merchant_register: MerchantRegister,
 ) -> AuthenticationResponse:
     """Create a new merchant in the database."""
-    try: 
     # Check if a merchant with the same username or email already exists
-        existing_merchant = (
-            state.session.query(Merchant)
-            .filter(
-                (Merchant.username == merchant_register.username)
-                | (Merchant.email == merchant_register.email),
-            )
-            .first()
+    existing_merchant = (
+        state.session.query(Merchant)
+        .filter(
+            (Merchant.username == merchant_register.username)
+            | (Merchant.email == merchant_register.email),
+        )
+        .first()
+    )
+
+    if existing_merchant:
+        raise ConflictingError(
+            "an account with the same username or email already exists"
         )
 
-        if existing_merchant:
-            raise ConflictingError(
-                "an account with the same username or email already exists"
-            )
+    salt, hashed_password = configuration.generate_password(
+        merchant_register.password
+    )
 
-        salt, hashed_password = state.generate_password(merchant_register.password)
+    new_merchant = Merchant(
+        first_name=merchant_register.first_name,
+        last_name=merchant_register.last_name,
+        username=merchant_register.username,
+        email=merchant_register.email,
+        hashed_password=hashed_password,
+        salt=salt,
+    )
 
-        new_merchant = Merchant(
-            first_name=merchant_register.first_name,
-            last_name=merchant_register.last_name,
-            username=merchant_register.username,
-            email=merchant_register.email,
-            hashed_password=hashed_password,
-            salt=salt,
-        )
+    state.session.add(new_merchant)
+    state.session.commit()
 
-        state.session.add(new_merchant)
-        state.session.commit()
+    state.session.refresh(new_merchant)
 
-        state.session.refresh(new_merchant)
+    token = configuration.encode_jwt(
+        {"merchant_id": new_merchant.id}, datetime.timedelta(days=5)
+    )
+    role = "merchant"
 
-        token = state.encode_jwt(
-            {"merchant_id": new_merchant.id}
-        )
-        role = "merchant"
-
-        return AuthenticationResponse(
-            jwt_token=token, id=new_merchant.id, role=role  # type:ignore
-        )
-    except Exception as e:
-        print(e)
-        return None
+    return AuthenticationResponse(
+        jwt_token=token, id=new_merchant.id, role=role  # type:ignore
+    )
 
 
 async def login_merchant(
-    state: State, merchant_login: MerchantLogin
+    state: State, configuration: Configuration, merchant_login: MerchantLogin
 ) -> AuthenticationResponse:
     """Authenticate a merchant and return a JWT token."""
     merchant = (
@@ -80,13 +81,13 @@ async def login_merchant(
     if hashsed_password != merchant.hashed_password:
         raise AuthenticationError("invalid username or password")
 
-    token = state.encode_jwt(
-        {"merchant_id": merchant.id}
+    token = configuration.encode_jwt(
+        {"merchant_id": merchant.id}, datetime.timedelta(days=5)
     )
 
     role = "merchant"
     return AuthenticationResponse(
-        jwt_token=token, id=merchant.id, role= role  # type:ignore
+        jwt_token=token, id=merchant.id, role=role  # type:ignore
     )
 
 
@@ -97,4 +98,3 @@ async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
         .filter(Merchant.id == merchant_id)
         .first()
     )
-    

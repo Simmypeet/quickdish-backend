@@ -23,8 +23,10 @@ class Restaurant(RestaurantBase):
     """
     The schema for public restaurant data.
     """
+
     id: int
     merchant_id: int
+    open: bool
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -53,6 +55,7 @@ class OptionBase(BaseModel):
     description: str | None
     extra_price: Decimal | None
 
+
 class OptionCreate(OptionBase):
     pass
 
@@ -63,11 +66,13 @@ class Option(OptionBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class CustomizationBase(BaseModel):
     title: str
     description: str | None
     unique: bool
     required: bool
+
 
 class CustomizationCreate(CustomizationBase):
     """Used for creating a new customization for a menu item."""

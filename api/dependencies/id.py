@@ -4,13 +4,13 @@ from typing import Annotated
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.dependencies.state import get_state
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api.errors.session import (
     ExpiredSessionError,
     InvalidHeaderSchemeError,
     InvalidSessionTokenError,
 )
-from api.state import State
 
 import jwt
 
@@ -34,7 +34,7 @@ class GetID:
         credentials: Annotated[
             HTTPAuthorizationCredentials, Depends(HTTPBearer())
         ],
-        state: Annotated[State, Depends(get_state)],
+        configuration: Annotated[Configuration, Depends(get_configuration)],
     ) -> int:
         if credentials.scheme != "Bearer":
             raise InvalidHeaderSchemeError()
@@ -42,7 +42,7 @@ class GetID:
         try:
             return jwt.decode(  # type:ignore
                 credentials.credentials,
-                state.jwt_secret,
+                configuration.jwt_secret,
                 algorithms=["HS256"],
             )[self.__id_name]
 
@@ -70,7 +70,7 @@ def get_user(
     credentials: Annotated[
         HTTPAuthorizationCredentials, Depends(HTTPBearer())
     ],
-    state: Annotated[State, Depends(get_state)],
+    configuration: Annotated[Configuration, Depends(get_configuration)],
 ) -> tuple[int, Role]:
     """
     Gets the user ID and role from the JWT token stored in the `Authorization`
@@ -82,7 +82,7 @@ def get_user(
     try:
         decoded = jwt.decode(  # type:ignore
             credentials.credentials,
-            state.jwt_secret,
+            configuration.jwt_secret,
             algorithms=["HS256"],
         )
 

@@ -1,9 +1,10 @@
-import sys
 from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
 
+from api.configuration import Configuration
 from api.crud.restaurant import (
+    close_restaurant,
     create_customization,
     create_menu,
     create_restaurant,
@@ -12,15 +13,16 @@ from api.crud.restaurant import (
     get_menu_image,
     get_restaurant,
     get_restaurant_menus,
+    open_restaurant,
+    search_restaurant,
     upload_menu_image,
     upload_restaurant_image,
     get_restaurant_image,
-    get_restaurant_reviews, 
-    get_restaurant_tags
+    get_restaurant_reviews,
 )
+from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
-from api.errors import NotFoundError
 from api.schemas.restaurant import (
     CustomizationCreate,
     Menu,
@@ -29,7 +31,6 @@ from api.schemas.restaurant import (
     Restaurant,
     RestaurantCreate,
 )
-from api.schemas.Tag import RestaurantTag as RestaurantTagSchema
 from api.schemas.customer import CustomerReview as CustomerReviewSchema
 from api.state import State
 
@@ -61,6 +62,18 @@ async def create_restaurant_api(
 
 
 @router.get(
+    "/search",
+    description="Get a list of restaurants from search query.",
+)
+async def search_restaurants_api(
+    query: str,
+    limit: int = 10,
+    state: State = Depends(get_state),
+) -> list[int]:
+    return await search_restaurant(query, limit, state)
+
+
+@router.get(
     "/{restaurant_id}",
     description="Get the restaurant details.",
 )
@@ -69,6 +82,42 @@ async def get_restaurant_api(
     state: State = Depends(get_state),
 ) -> Restaurant:
     return await get_restaurant(state, restaurant_id)
+
+
+@router.put(
+    "/{restaurant_id}/open",
+    description="""
+        Open the restaurant. This endpoint requires the merchant to be
+        authenticated.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def open_restaurant_api(
+    restaurant_id: int,
+    merchant_id: int = Depends(get_merchant_id),
+    state: State = Depends(get_state),
+) -> str:
+    await open_restaurant(state, restaurant_id, merchant_id)
+
+    return "restaurant opened"
+
+
+@router.put(
+    "/{restaurant_id}/close",
+    description="""
+        Close the restaurant. This endpoint requires the merchant to be
+        authenticated.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def close_restaurant_api(
+    restaurant_id: int,
+    merchant_id: int = Depends(get_merchant_id),
+    state: State = Depends(get_state),
+) -> str:
+    await close_restaurant(state, restaurant_id, merchant_id)
+
+    return "restaurant closed"
 
 
 @router.put(
@@ -83,10 +132,12 @@ async def upload_restaurant_image_api(
     restaurant_id: int,
     image: UploadFile,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
     result: int = Depends(get_merchant_id),
 ) -> str:
     await upload_restaurant_image(
         state,
+        configuration,
         restaurant_id,
         image,
         result,
@@ -188,10 +239,12 @@ async def upload_menu_image_api(
     menu_id: int,
     image: UploadFile,
     state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
     merchant_id: int = Depends(get_merchant_id),
 ) -> str:
     await upload_menu_image(
         state,
+        configuration,
         menu_id,
         image,
         merchant_id,
@@ -251,6 +304,7 @@ async def create_customization_api(
         merchant_id,
     )
 
+
 @router.get(
     "/menus/{menu_id}/customizations",
     description="""
@@ -265,22 +319,12 @@ async def get_menu_customizations_api(
         for customization in await get_menu_customizations(state, menu_id)
     ]
 
-@router.get("/reviews/{restaurant_id}", 
-        description="""Get the reviews of a restaurant by their ID."""
+
+@router.get(
+    "/reviews/{restaurant_id}",
+    description="""Get the reviews of a restaurant by their ID.""",
 )
 async def get_restaurant_reviews_by_id_api(
-    restaurant_id: int,
-    state: State = Depends(get_state)
+    restaurant_id: int, state: State = Depends(get_state)
 ) -> list[CustomerReviewSchema]:
-    return await get_restaurant_reviews(restaurant_id, state) 
-
-
-@router.get("/tags/{restaurant_id}",
-    description="""Get the reviews of a restaurant by their ID."""
-)
-async def get_tag_by_restaurant_id_api(
-    restaurant_id: int,
-    state: State = Depends(get_state)
-) -> list[RestaurantTagSchema] : 
-    return await get_restaurant_tags(restaurant_id, state)
-
+    return await get_restaurant_reviews(restaurant_id, state)

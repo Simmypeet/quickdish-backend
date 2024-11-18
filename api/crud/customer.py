@@ -1,248 +1,241 @@
-from logging import error
 import logging
 import os
-import jwt
-from api.errors import ConflictingError, NotFoundError
-
-from api.errors import ConflictingError, NotFoundError
+from api.configuration import REFRESH_TOKEN_EXPIRE_DAYS, Configuration
+from api.errors import ConflictingError, InvalidArgumentError, NotFoundError
 from api.errors.authentication import AuthenticationError
-from api.schemas.authentication import AuthenticationResponse
-from api.state import REFRESH_TOKEN_EXPIRE_DAYS, REFRESH_TOKEN_EXPIRE_SECOND, State
-from api.models.customer import Customer, CustomerReview
 from api.models.RefreshToken import RefreshToken
+from api.models.restaurant import Restaurant
+from api.schemas.authentication import AuthenticationResponse
+from api.state import State
+from api.models.customer import Customer, CustomerReview, FavoriteRestaurant
 from api.schemas.customer import (
     CustomerLogin,
     CustomerRegister,
     CustomerReview as CustomerReviewSchema,
     CustomerReviewCreate,
-    CustomerUpdate
+    CustomerUpdate,
 )
 from fastapi.responses import JSONResponse, FileResponse
 
 from typing import List
 import hashlib
-from fastapi import HTTPException, Request, Response, UploadFile
+from fastapi import HTTPException, Request, UploadFile
 
-# import datetime
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone, datetime
 
 
 async def register_customer(
-    state: State, customer_create: CustomerRegister, response: Response
-) -> AuthenticationResponse:
+    state: State,
+    configuration: Configuration,
+    customer_create: CustomerRegister,
+) -> tuple[AuthenticationResponse, str]:
     """Create a new customer in the database."""
-    try: 
-        # Check if a customer with the same username or email already exists
-        
-        existing_customer = (
-            state.session.query(Customer)
-            .filter(
-                (Customer.username == customer_create.username)
-                | (Customer.email == customer_create.email),
-            )
-            .first()
+
+    # Check if a customer with the same username or email already exists
+    existing_customer = (
+        state.session.query(Customer)
+        .filter(
+            (Customer.username == customer_create.username)
+            | (Customer.email == customer_create.email),
+        )
+        .first()
+    )
+
+    if existing_customer:
+        raise ConflictingError(
+            "an account with the same username or email already exists"
         )
 
-        if existing_customer:
-            raise ConflictingError(
-                "an account with the same username or email already exists"
-            )
+    salt, hashed_password = configuration.generate_password(
+        customer_create.password
+    )
 
-        salt, hashed_password = state.generate_password(customer_create.password)
+    new_customer = Customer(
+        first_name=customer_create.first_name,
+        last_name=customer_create.last_name,
+        username=customer_create.username,
+        email=customer_create.email,
+        hashed_password=hashed_password,
+        salt=salt,
+    )
 
-        new_customer = Customer(
-            first_name=customer_create.first_name,
-            last_name=customer_create.last_name,
-            username=customer_create.username,
-            email=customer_create.email,
-            hashed_password=hashed_password,
-            salt=salt,
-        )
+    state.session.add(new_customer)
+    state.session.commit()
 
-        state.session.add(new_customer)
-        state.session.commit()
+    state.session.refresh(new_customer)
 
-        state.session.refresh(new_customer)
+    token = configuration.encode_jwt(
+        {"customer_id": new_customer.id}, timedelta(minutes=5)
+    )
 
-        token = state.encode_jwt(
-            {"customer_id": new_customer.id}
-        )
+    refresh_token = configuration.create_refresh_token(
+        {"customer_id": new_customer.id}
+    )
 
-        refresh_token = state.create_refresh_token(
-            {"customer_id": new_customer.id}
-        )
+    # store refresh token in database
+    stored_refresh_token = RefreshToken(
+        customer_id=new_customer.id,
+        role="user",
+        token=refresh_token,
+        expired_at=datetime.now(timezone.utc)
+        + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    # add refresh token to database if not exists, if already exists, update the token
+    state.session.add(stored_refresh_token)
+    state.session.commit()
 
-        #store refresh token in database 
-        stored_refresh_token = RefreshToken(
-            customer_id = new_customer.id,
-            role = "user",  
-            token = refresh_token,
-            expired_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-            # expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
-        )
-        #add refresh token to database if not exists, if already exists, update the token
-        state.session.add(stored_refresh_token)
-        state.session.commit()
+    # set refresh token in HTTP-only cookie
+    # response.set_cookie(
+    #     key="refresh_token",
+    #     value=refresh_token,
+    #     httponly=True,
+    #     secure=True,
+    #     samesite="lax",
+    #     max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
+    # )
 
-        #set refresh token in HTTP-only cookie
-        # response.set_cookie(
-        #     key="refresh_token",
-        #     value=refresh_token,
-        #     httponly=True,
-        #     secure=True,
-        #     samesite="lax",
-        #     max_age=timedelta(REFRESH_TOKEN_EXPIRE_DAYS),
-        # )
-        response.delete_cookie(
-            "refresh_token"
-        )
-
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=False,
-            secure=False,
-            samesite="lax",
-            max_age=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-            # max_age = timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
-        )
-        
-        role = "user"
-        return AuthenticationResponse(
-            role=role, jwt_token=token, id=new_customer.id  # type: ignore
-        )
-    except Exception as e:
-        logging.error("Error registering customer: %s", e)
-        raise AuthenticationError("error registering customer")
+    return (
+        AuthenticationResponse(
+            jwt_token=token, id=new_customer.id  # type: ignore
+        ),
+        refresh_token,
+    )
 
 
 async def login_customer(
-    state: State, customer_login: CustomerLogin, response: Response
-) -> AuthenticationResponse:
+    state: State,
+    configuration: Configuration,
+    customer_login: CustomerLogin,
+) -> tuple[AuthenticationResponse, str]:
     """Authenticate a customer and return a JWT token."""
-    try: 
-        customer = (
-            state.session.query(Customer)
-            .filter(Customer.username == customer_login.username)
-            .first()
-        )
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.username == customer_login.username)
+        .first()
+    )
 
-        if not customer:
-            raise AuthenticationError("invalid username or password")
-
-        salted_password = customer_login.password + customer.salt
-        hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
-
-        if hashsed_password != customer.hashed_password:
-            raise AuthenticationError("invalid username or password")
-
-        token = state.encode_jwt({"customer_id": customer.id})
-        refresh_token = state.create_refresh_token(
-            {"customer_id": customer.id}
-        )
-
-        #store refresh token in database 
-        add_or_update_refresh_token(state, "user", customer.id, refresh_token)
-        
-        #work
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=False, #type HTTP-only cookie
-            secure=False, #change to True in production: works only on HTTPS
-            samesite="lax", #Strict = cross-site cookies are not sent on cross-site requests, Lax = cookies are sent on top-level navigations and will be sent along with GET requests initiated by third party website
-            max_age= timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-            # max_age = timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
-        )
-        print("New refresh token set in cookie:", refresh_token)
-
-        
-        role = "user"
-
-        return AuthenticationResponse(
-            role=role, jwt_token=token, id=customer.id  # type: ignore
-        )
-    except Exception as e:
-        logging.error("Error logging in customer: %s", e)
+    if not customer:
         raise AuthenticationError("invalid username or password")
 
-async def refresh_access_token(state: State, request: Request) -> AuthenticationResponse:
-    try: 
-        # print("refresh token: ", response)
-        refresh_token = request.cookies.get("refresh_token")
+    salted_password = customer_login.password + customer.salt
+    hashsed_password = hashlib.sha256(salted_password.encode()).hexdigest()
 
-        if not refresh_token:
-            raise HTTPException(status_code=401, detail="Refresh token missing")
+    if hashsed_password != customer.hashed_password:
+        raise AuthenticationError("invalid username or password")
 
-        refresh_token_pair = state.session.query(RefreshToken).filter(RefreshToken.token == refresh_token).first()
-        customer_id = refresh_token_pair.customer_id
-        customer = state.session.query(Customer).filter(Customer.id == customer_id).first()
+    token = configuration.encode_jwt(
+        {"customer_id": customer.id}, timedelta(minutes=5)
+    )
+    refresh_token = configuration.create_refresh_token(
+        {"customer_id": customer.id}
+    )
 
-        if not customer:
-            raise HTTPException(status_code=402, detail="Invalid token")
+    # store refresh token in database
+    add_or_update_refresh_token(state, "user", customer.id, refresh_token)
 
-        if refresh_token_pair.expired_at < datetime.now():
-            raise HTTPException(status_code=405, detail="Token expired")
-            #problem : frontend should handle this like redirect to login page, if backend return exception 
-        
-        try:
-            payload = state.encode_jwt({"customer_id": customer_id})
-            return AuthenticationResponse( role="user", jwt_token=payload, id=customer_id)
-            # raise HTTPException(status_code=405, detail="Token expired")
+    role = "user"
 
-        except error as e: 
-            logging.error("Error encoding JWT: %s", e)
+    return (
+        AuthenticationResponse(
+            role=role, jwt_token=token, id=customer.id  # type: ignore
+        ),
+        refresh_token,
+    )
 
-        return AuthenticationResponse(
-            role="Invalid", jwt_token="Invalid", id=customer_id
-        )
-    except Exception as e:
-        logging.error("Error refreshing token: %s", e)
 
-def add_or_update_refresh_token(state: State, role: str, customer_id: int, refresh_token: str) -> None:
-    existing_refresh_token = state.session.query(RefreshToken).filter(RefreshToken.customer_id == customer_id).first()
-    if existing_refresh_token: 
+async def refresh_access_token(
+    state: State, configuration: Configuration, request: Request
+) -> tuple[AuthenticationResponse, str]:
+    # print("refresh token: ", response)
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
+
+    refresh_token_pair = (
+        state.session.query(RefreshToken)
+        .filter(RefreshToken.token == refresh_token)
+        .first()
+    )
+
+    if not refresh_token_pair:
+        raise AuthenticationError("invalid token")
+
+    customer_id = refresh_token_pair.customer_id
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise HTTPException(status_code=402, detail="Invalid token")
+
+    if refresh_token_pair.expired_at < datetime.now():
+        raise HTTPException(status_code=403, detail="Token expired")
+
+    payload = configuration.encode_jwt(
+        {"customer_id": customer_id}, timedelta(5)
+    )
+
+    return (
+        AuthenticationResponse(jwt_token=payload, id=customer_id),
+        refresh_token,
+    )
+
+
+def add_or_update_refresh_token(
+    state: State,
+    role: str,
+    customer_id: int,
+    refresh_token: str,
+) -> None:
+    existing_refresh_token = (
+        state.session.query(RefreshToken)
+        .filter(RefreshToken.customer_id == customer_id)
+        .first()
+    )
+
+    if existing_refresh_token:
         existing_refresh_token.token = refresh_token
-        existing_refresh_token.expired_at = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-        # existing_refresh_token.expired_at = datetime.now() + timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
+        existing_refresh_token.expired_at = datetime.now() + timedelta(
+            days=REFRESH_TOKEN_EXPIRE_DAYS
+        )
 
-    else: 
+    else:
         new_refresh_token = RefreshToken(
-            customer_id = customer_id,
-            role = role,
-            token = refresh_token,
-            expired_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            customer_id=customer_id,
+            role=role,
+            token=refresh_token,
+            expired_at=datetime.now(timezone.utc)
+            + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
             # expired_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=REFRESH_TOKEN_EXPIRE_SECOND)
-
         )
         state.session.add(new_refresh_token)
 
-    try: 
-        state.session.commit()
-
-    except Exception as e:
-        state.session.rollback()
-        logging.error("Error adding or updating refresh token: %s", e)
+    state.session.commit()
 
 
 async def get_customer(state: State, customer_id: int) -> Customer:
     """Get a customer by their ID."""
-    try: 
-        result = (
-            state.session.query(Customer)
-            .filter(Customer.id == customer_id)
-            .first()
-        )
+    result = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
 
-        if result is None:
-            raise NotFoundError("customer with the ID in the token is not found")
+    if result is None:
+        raise NotFoundError("customer with the ID in the token is not found")
 
-        return result
-    except Exception as e: 
-        logging.error("Error getting customer: %s", e)
+    return result
 
 
-async def update_customer(state: State, customer_id: int, payload: CustomerUpdate): 
+async def update_customer(
+    configuration: Configuration,
+    state: State,
+    customer_id: int,
+    payload: CustomerUpdate,
+) -> JSONResponse:
     logging.info("received customer ", payload)
     result = (
         state.session.query(Customer)
@@ -250,12 +243,20 @@ async def update_customer(state: State, customer_id: int, payload: CustomerUpdat
         .first()
     )
 
-    if compare_password(state, payload.password, result.salt, result.hashed_password): 
+    if result is None:
+        raise NotFoundError("customer with the ID in the token is not found")
+
+    if compare_password(
+        state, payload.password, result.salt, result.hashed_password
+    ):
         result.username = payload.username
         result.email = payload.email
-        if payload.new_password != '':
-            salt, new_hashed_password = state.generate_password(payload.new_password)
-            result.hashed_password = new_hashed_password  
+
+        if payload.new_password != "":
+            salt, new_hashed_password = configuration.generate_password(
+                payload.new_password
+            )
+            result.hashed_password = new_hashed_password
             result.salt = salt
             state.session.commit()
             return JSONResponse(
@@ -263,89 +264,231 @@ async def update_customer(state: State, customer_id: int, payload: CustomerUpdat
                 content={"message": "Customer updated successfully"},
             )
 
-        if result is None: 
-            raise NotFoundError("customer with the ID in the token is not found")
-    else: 
-        raise HTTPException(status_code=402, detail="Unmatched password")
-  
+        else:
+            raise InvalidArgumentError("New password cannot be empty")
 
-def compare_password(state: State, str_pw: str, salt: str, hashed_pw: str) -> bool:
+    else:
+        raise HTTPException(status_code=402, detail="Unmatched password")
+
+
+def compare_password(
+    state: State, str_pw: str, salt: str, hashed_pw: str
+) -> bool:
     """Compare a plain password with a hashed password. -> true = same"""
     salted_str_pw = str_pw + salt
     hashed_str_pw = hashlib.sha256(salted_str_pw.encode()).hexdigest()
     return hashed_pw == hashed_str_pw
-        
+
 
 async def upload_profile(
-    image: UploadFile, 
+    configuration: Configuration,
+    image: UploadFile,
     customer_id: int,
-    state: State
+    state: State,
 ) -> str:
-    try:
-        customer =  (
-            state.session.query(Customer)
-            .filter(Customer.id == customer_id)
-            .first()
-        )
-        image_dir = os.path.join(
-            state.application_data_path, "customers/profile", str(customer_id)
-        )
-        image_path = await state.upload_image(image, image_dir)
-        print(image_path)
-        customer.profile_pic = image_path
-        state.session.commit()
-        return image_path
-    except Exception as e:
-        logging.error("Error uploading profile image: %s", e)
-
-
-async def upload_banner(
-    image: UploadFile, 
-    customer_id: int,
-    state: State
-) ->  str:
-    customer =  (
-            state.session.query(Customer)
-            .filter(Customer.id == customer_id)
-            .first()
-        )
-    image_dir = os.path.join(
-        state.application_data_path, "customers/banner", str(customer_id)
-    )
-    image_path = await state.upload_image(image, image_dir)
-    customer.userpage_pic = image_path
-    state.session.commit()
-    return image_path
-
-async def get_profile_img(state: State, customer_id: int) -> FileResponse: 
-    customer =  (
+    customer = (
         state.session.query(Customer)
         .filter(Customer.id == customer_id)
         .first()
     )
 
-    if not customer: 
+    if not customer:
         raise NotFoundError("Customer not found")
-    
+
+    image_dir = os.path.join(
+        configuration.application_data_path,
+        "customers/profile",
+        str(customer_id),
+    )
+    image_path = await configuration.upload_image(image, image_dir)
+    print(image_path)
+    customer.profile_pic = image_path
+    state.session.commit()
+    return image_path
+
+
+async def upload_banner(
+    configuration: Configuration,
+    image: UploadFile,
+    customer_id: int,
+    state: State,
+) -> str:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("Customer not found")
+
+    image_dir = os.path.join(
+        configuration.application_data_path,
+        "customers/banner",
+        str(customer_id),
+    )
+    image_path = await configuration.upload_image(image, image_dir)
+    customer.userpage_pic = image_path
+    state.session.commit()
+    return image_path
+
+
+async def get_profile_img(
+    state: State, customer_id: int
+) -> FileResponse | None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("Customer not found")
+
     if not customer.profile_pic:
         return None
-    
-    return FileResponse(customer.profile_pic)
-  
 
-async def get_banner_img(state: State, customer_id: int) -> FileResponse: 
-    customer =  (
-            state.session.query(Customer)
-            .filter(Customer.id == customer_id)
-            .first()
-        )
-    if not customer: 
+    return FileResponse(customer.profile_pic)
+
+
+async def get_banner_img(
+    state: State, customer_id: int
+) -> FileResponse | None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+    if not customer:
         raise NotFoundError("Customer not found")
-    
+
     if not customer.userpage_pic:
         return None
-    
+
     return FileResponse(customer.userpage_pic)
+
+
+async def get_favorite_restaurant_ids(
+    state: State, customer_id: int
+) -> list[int]:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    results = (
+        state.session.query(FavoriteRestaurant)
+        .filter(FavoriteRestaurant.customer_id == customer_id)
+        .all()
+    )
+
+    return [result.restaurant_id for result in results]
+
+
+async def delete_favorite_restaurant_ids(
+    state: State,
+    customer_id: int,
+    restaurant_ids: list[int],
+) -> None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    seen: set[int] = set()
+    removing_restaurants: list[FavoriteRestaurant] = []
+    for restaurant_id in restaurant_ids:
+        if restaurant_id in seen:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} is duplicated in the request"
+            )
+
+        removing_restaurant = (
+            state.session.query(FavoriteRestaurant)
+            .filter(
+                (FavoriteRestaurant.customer_id == customer_id)
+                & (FavoriteRestaurant.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
+
+        if not removing_restaurant:
+            raise NotFoundError(
+                f"restaurant id {restaurant_id} not found in the favorite list"
+            )
+
+        removing_restaurants.append(removing_restaurant)
+
+        seen.add(restaurant_id)
+
+    for restaurant in removing_restaurants:
+        state.session.delete(restaurant)
+
+    state.session.commit()
+
+
+async def add_favorite_restaurant_ids(
+    state: State,
+    customer_id: int,
+    restaurant_ids: list[int],
+) -> None:
+    customer = (
+        state.session.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+
+    if not customer:
+        raise NotFoundError("customer not found")
+
+    seen: set[int] = set()
+
+    for restaurant_id in restaurant_ids:
+        existing_favorite = (
+            state.session.query(FavoriteRestaurant)
+            .filter(
+                (FavoriteRestaurant.customer_id == customer_id)
+                & (FavoriteRestaurant.restaurant_id == restaurant_id)
+            )
+            .first()
+        )
+
+        if restaurant_id in seen:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} is duplicated in the request"
+            )
+
+        seen.add(restaurant_id)
+
+        if existing_favorite:
+            raise ConflictingError(
+                f"restaurant id {restaurant_id} already exists in the favorite list"
+            )
+
+        restaurant = (
+            state.session.query(Restaurant)
+            .filter(Restaurant.id == restaurant_id)
+            .first()
+        )
+
+        if not restaurant:
+            raise NotFoundError(f"restaurant id {restaurant_id} not found")
+
+    for restaurant_id in restaurant_ids:
+        new_favorite = FavoriteRestaurant(
+            customer_id=customer_id, restaurant_id=restaurant_id
+        )
+        state.session.add(new_favorite)
+
+    state.session.commit()
 
 
 # customer review

@@ -2,15 +2,15 @@ import os
 from typing import Any
 from fastapi.testclient import TestClient
 
-from api.dependencies.state import get_state
-from api.state import State
+from api.configuration import Configuration
+from api.dependencies.configuration import get_configuration
 from api import app
 
 import jwt
 
 
-def test_restaurant(state_fixture: State):
-    app.dependency_overrides[get_state] = lambda: state_fixture
+def test_restaurant(configuration_fixture: Configuration):
+    app.dependency_overrides[get_configuration] = lambda: configuration_fixture
     test_client = TestClient(app)
 
     response = test_client.post(
@@ -28,16 +28,31 @@ def test_restaurant(state_fixture: State):
 
     merchant_id = jwt.decode(  # type:ignore
         response.json()["jwt_token"],
-        state_fixture.jwt_secret,
+        configuration_fixture.jwt_secret,
         algorithms=["HS256"],
     )["merchant_id"]
     merchant_token = response.json()["jwt_token"]
+
+    response = test_client.post(
+        "/canteens/add_canteen",
+        json={
+            "name": "Test Canteen",
+            "address": "123 Test St",
+            "latitude": 123,
+            "longitude": 123,
+        },
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+    canteen_id = response.json()["id"]
 
     response = test_client.post(
         "/restaurants",
         json={
             "name": "Test Restaurant",
             "address": "123 Test St",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 123,
                 "lng": 123,
@@ -55,6 +70,7 @@ def test_restaurant(state_fixture: State):
         json={
             "name": "Test Restaurant",
             "address": "456 Test St",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 456,
                 "lng": 456,
@@ -78,6 +94,7 @@ def test_restaurant(state_fixture: State):
     }
     assert response.json()["merchant_id"] == merchant_id
     assert response.json()["id"] == restaurant_id
+    assert not response.json()["open"]
 
     file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.jpg")
 
@@ -330,3 +347,41 @@ def test_restaurant(state_fixture: State):
     )
 
     assert failed_response.status_code == 403
+
+    # open restaurant
+    response = test_client.put(
+        f"/restaurants/{restaurant_id}/open",
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response = test_client.get(
+        f"/restaurants/{restaurant_id}",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["open"]
+
+    # close restaurant
+    response = test_client.put(
+        f"/restaurants/{restaurant_id}/close",
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+
+    # test unauthorized merchant
+    failed_response = test_client.put(
+        f"/restaurants/{restaurant_id}/open",
+        headers={"Authorization": f"Bearer{unauthorized_merchant_token}"},
+    )
+
+    assert failed_response.status_code == 403
+
+    response = test_client.get(
+        f"/restaurants/{restaurant_id}",
+    )
+
+    assert response.status_code == 200
+    assert not response.json()["open"]
