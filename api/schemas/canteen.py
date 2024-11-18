@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CanteenBase(BaseModel):
@@ -7,6 +7,7 @@ class CanteenBase(BaseModel):
     longitude: float
 
 
-class GetCanteen(CanteenBase):
+class Canteen(CanteenBase):
     id: int
-    img: str
+
+    model_config = ConfigDict(from_attributes=True)

@@ -2,8 +2,7 @@ from api.configuration import Configuration
 from api.models.canteen import Canteen
 from api.models.restaurant import Restaurant
 from api.state import State
-from api.schemas.canteen import CanteenBase, GetCanteen
-from api.schemas.restaurant import GetRestaurant
+from api.schemas.canteen import CanteenBase
 from fastapi.responses import FileResponse
 from api.errors import NotFoundError
 
@@ -19,36 +18,18 @@ logger = logging.getLogger(__name__)
 
 async def get_nearest_canteens(
     state: State, user_lat: float, user_long: float
-) -> List[GetCanteen]:
-    ranks = []
-    try:
-        canteens = state.session.query(Canteen).all()
-        distance = [
-            (
-                c,
-                await calc_distance(
-                    c.latitude, c.longitude, user_lat, user_long
-                ),
-            )
-            for c in canteens
-        ]
-        sorted_distance = sorted(distance, key=lambda x: x[1])
-        ranks = [None] * len(canteens)
+) -> List[Canteen]:
+    canteens = state.session.query(Canteen).all()
+    distance = [
+        (
+            c,
+            await calc_distance(c.latitude, c.longitude, user_lat, user_long),
+        )
+        for c in canteens
+    ]
+    sorted_distance = sorted(distance, key=lambda x: x[1])
 
-        ranks = [
-            GetCanteen(
-                id=val[0].id,
-                name=val[0].name,
-                img=val[0].img,
-                latitude=val[0].latitude,
-                longitude=val[0].longitude,
-            )
-            for val in sorted_distance
-        ]
-
-    except Exception as e:
-        logger.error(f"Error getting nearest canteens: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+    ranks = [val[0] for val in sorted_distance]
 
     return ranks
 
@@ -73,25 +54,15 @@ async def add_canteen(state: State, payload: CanteenBase) -> Canteen:
 
 async def get_nearest_restaurants(
     state: State, user_lat: float, user_long: float
-) -> List[GetRestaurant]:
+) -> List[Restaurant]:
     ranked_canteens = await get_nearest_canteens(state, user_lat, user_long)
+
+    if len(ranked_canteens) == 0:
+        # no canteens found
+        return []
+
     id = ranked_canteens[0].id
-    restaurants = (
-        state.session.query(Restaurant).filter_by(canteen_id=id).all()
-    )
-    result = [
-        GetRestaurant(
-            id=restaurant.id,
-            name=restaurant.name,
-            address=restaurant.address,
-            img=restaurant.image if restaurant.image else "",
-            merchant_id=restaurant.merchant_id,
-            location=restaurant.location,
-            canteen_id=restaurant.canteen_id,
-        )
-        for restaurant in restaurants
-    ]
-    return result
+    return state.session.query(Restaurant).filter_by(canteen_id=id).all()
 
 
 async def calc_distance(

@@ -19,12 +19,10 @@ from api.crud.canteen import (
     get_canteen_by_restaurant_id,
 )
 
-# , get_nearest_restaurants
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
-from api.dependencies.id import get_merchant_id
-from api.schemas.restaurant import GetRestaurant
-from api.schemas.canteen import CanteenBase, GetCanteen
+from api.schemas.restaurant import Restaurant
+from api.schemas.canteen import Canteen, CanteenBase
 
 from api.state import State
 
@@ -44,9 +42,11 @@ async def get_canteens_api(
     user_lat: float,
     user_long: float,
     state: State = Depends(get_state),
-    result: int = Depends(get_merchant_id),
-) -> List[GetCanteen]:
-    return await get_nearest_canteens(state, user_lat, user_long)
+) -> List[Canteen]:
+    return [
+        Canteen.model_validate(canteen)
+        for canteen in await get_nearest_canteens(state, user_lat, user_long)
+    ]
 
 
 @router.post(
@@ -58,8 +58,7 @@ async def get_canteens_api(
 async def add_canteen_api(
     payload: CanteenBase,
     state: State = Depends(get_state),
-    result: int = Depends(get_merchant_id),
-) -> GetCanteen:
+) -> Canteen:
     return await add_canteen(state, payload)
 
 
@@ -125,5 +124,10 @@ async def get_nearest_restaurants_api(
     user_lat: float,
     user_long: float,
     state: State = Depends(get_state),
-) -> List[GetRestaurant]:
-    return await get_nearest_restaurants(state, user_lat, user_long)
+) -> List[Restaurant]:
+    return [
+        Restaurant.model_validate(restaurant)
+        for restaurant in await get_nearest_restaurants(
+            state, user_lat, user_long
+        )
+    ]
