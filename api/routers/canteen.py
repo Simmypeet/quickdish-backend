@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from api.configuration import Configuration
 from api.crud.canteen import (
+    get_canteen_by_id,
     get_nearest_canteens,
     add_canteen,
     get_restaurants_in_canteen,
@@ -83,6 +84,30 @@ async def get_nearest_restaurants_api(
 
 
 @router.get(
+    "/restaurants/{restaurant_id}",
+    description="""
+            Get canteen by restaurant id
+        """,
+)
+async def get_canteen_by_restaurant_id_api(
+    restaurant_id: int, state: State = Depends(get_state)
+) -> CanteenBase:
+    return await get_canteen_by_restaurant_id(state, restaurant_id)
+
+
+@router.get(
+    "/{canteen_id}",
+    description="""
+        Get the information of a canteen by id
+    """,
+)
+async def get_canteen_by_id_api(
+    canteen_id: int, state: State = Depends(get_state)
+) -> Canteen:
+    return await get_canteen_by_id(state, canteen_id)
+
+
+@router.get(
     "/{canteen_id}/restaurants",
     description="""
         Get a list of restaurant ids in this canteen
@@ -132,15 +157,3 @@ async def get_canteen_img_api(
             return None
         case image:
             return image
-
-
-@router.get(
-    "/restaurants/{restaurant_id}",
-    description="""
-            Get canteen by restaurant id
-        """,
-)
-async def get_canteen_by_restaurant_id_api(
-    restaurant_id: int, state: State = Depends(get_state)
-) -> CanteenBase:
-    return await get_canteen_by_restaurant_id(state, restaurant_id)
