@@ -64,6 +64,25 @@ async def add_canteen_api(
 
 
 @router.get(
+    "/canteen/restaurants",
+    description="""
+        Get restaurants of the nearest canteen
+    """,
+)
+async def get_nearest_restaurants_api(
+    user_lat: float,
+    user_long: float,
+    state: State = Depends(get_state),
+) -> List[Restaurant]:
+    return [
+        Restaurant.model_validate(restaurant)
+        for restaurant in await get_nearest_restaurants(
+            state, user_lat, user_long
+        )
+    ]
+
+
+@router.get(
     "/{canteen_id}/restaurants",
     description="""
         Get a list of restaurant ids in this canteen
@@ -125,22 +144,3 @@ async def get_canteen_by_restaurant_id_api(
     restaurant_id: int, state: State = Depends(get_state)
 ) -> CanteenBase:
     return await get_canteen_by_restaurant_id(state, restaurant_id)
-
-
-@router.get(
-    "/canteen/restaurants",
-    description="""
-        Get restaurants of the nearest canteen
-    """,
-)
-async def get_nearest_restaurants_api(
-    user_lat: float,
-    user_long: float,
-    state: State = Depends(get_state),
-) -> List[Restaurant]:
-    return [
-        Restaurant.model_validate(restaurant)
-        for restaurant in await get_nearest_restaurants(
-            state, user_lat, user_long
-        )
-    ]
