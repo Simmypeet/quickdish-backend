@@ -13,6 +13,7 @@ from api.configuration import Configuration
 from api.crud.canteen import (
     get_nearest_canteens,
     add_canteen,
+    get_restaurants_in_canteen,
     update_canteen_img,
     get_canteen_img,
     get_nearest_restaurants,
@@ -60,6 +61,18 @@ async def add_canteen_api(
     state: State = Depends(get_state),
 ) -> Canteen:
     return await add_canteen(state, payload)
+
+
+@router.get(
+    "/{canteen_id}/restaurants",
+    description="""
+        Get a list of restaurant ids in this canteen
+    """,
+)
+async def get_restaurants_in_canteen_api(
+    canteen_id: int, state: State = Depends(get_state)
+) -> List[int]:
+    return await get_restaurants_in_canteen(state, canteen_id)
 
 
 @router.put(

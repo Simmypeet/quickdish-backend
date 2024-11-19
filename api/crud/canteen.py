@@ -139,3 +139,18 @@ async def get_canteen_by_restaurant_id(
         .first()
     )
     return canteen
+
+
+async def get_restaurants_in_canteen(
+    state: State, canteen_id: int
+) -> List[int]:
+    canteen = state.session.query(Canteen).filter_by(id=canteen_id).first()
+    if not canteen:
+        raise NotFoundError("Canteen not found")
+
+    return [
+        restaurant.id
+        for restaurant in state.session.query(Restaurant)
+        .filter_by(canteen_id=canteen_id)
+        .all()
+    ]

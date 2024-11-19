@@ -96,6 +96,13 @@ def test_restaurant(configuration_fixture: Configuration):
     assert response.json()["id"] == restaurant_id
     assert not response.json()["open"]
 
+    restaurants_in_canteen_response = test_client.get(
+        f"/canteens/{canteen_id}/restaurants",
+    )
+
+    assert restaurants_in_canteen_response.status_code == 200
+    assert restaurants_in_canteen_response.json() == [restaurant_id]
+
     file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.jpg")
 
     # image should be not found
