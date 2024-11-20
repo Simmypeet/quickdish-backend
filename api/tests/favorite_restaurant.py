@@ -38,11 +38,26 @@ def test_favorites_restaurant(configuration_fixture: Configuration):
 
     merchant_token = merchant_register_response.json()["jwt_token"]
 
+    response = test_client.post(
+        "/canteens/add_canteen",
+        json={
+            "name": "Test Canteen",
+            "address": "123 Test St",
+            "latitude": 123,
+            "longitude": 123,
+        },
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+    canteen_id = response.json()["id"]
+
     merchant_register_response = test_client.post(
         "/restaurants",
         json={
             "name": "Test Restaurant",
             "address": "123 Test St",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 123,
                 "lng": 123,

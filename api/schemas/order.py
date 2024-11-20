@@ -19,12 +19,6 @@ class OrderStatusFlag(StrEnum):
     SETTLED = "SETTLED"
 
 
-@unique
-class OrderNotificationFlag(StrEnum):
-    STATUS_CHANGE = "STATUS_CHANGE"
-    QUEUE_CHANGE = "QUEUE_CHANGE"
-
-
 class OrderedOrderBase(BaseModel):
     type: Literal[OrderStatusFlag.ORDERED] = OrderStatusFlag.ORDERED
 
@@ -91,25 +85,6 @@ OrderStatus = (
 class Queue(BaseModel):
     queue_count: int
     estimated_time: int
-
-
-class StatusChangeNotification(BaseModel):
-    type: Literal[OrderNotificationFlag.STATUS_CHANGE] = (
-        OrderNotificationFlag.STATUS_CHANGE
-    )
-    order_id: int
-    status: OrderStatus
-
-
-class QueueChangeNotification(BaseModel):
-    type: Literal[OrderNotificationFlag.QUEUE_CHANGE] = (
-        OrderNotificationFlag.QUEUE_CHANGE
-    )
-    order_id: int
-    queue: Queue
-
-
-OrderNotification = StatusChangeNotification | QueueChangeNotification
 
 
 OrderStatusUpdate = (

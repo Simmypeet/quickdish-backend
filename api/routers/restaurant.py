@@ -19,6 +19,7 @@ from api.crud.restaurant import (
     upload_restaurant_image,
     get_restaurant_image,
     get_restaurant_reviews,
+    update_menu
 )
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
@@ -251,6 +252,28 @@ async def upload_menu_image_api(
     )
 
     return "image updated"
+
+@router.put(
+    "/menus/{menu_id}",
+    description="""
+        Update a menu.
+    """,
+    dependencies=[Depends(HTTPBearer())],
+)
+async def update_menu_api(
+    menu_id: int,
+    payload: MenuCreate,
+    state: State = Depends(get_state),
+    configuration: Configuration = Depends(get_configuration),
+    merchant_id: int = Depends(get_merchant_id),
+) -> str:
+    await update_menu(
+        state,
+        menu_id,
+        payload
+    )
+
+    return "menu updated"
 
 
 @router.get(

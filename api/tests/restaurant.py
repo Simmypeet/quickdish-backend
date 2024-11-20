@@ -34,10 +34,25 @@ def test_restaurant(configuration_fixture: Configuration):
     merchant_token = response.json()["jwt_token"]
 
     response = test_client.post(
+        "/canteens/add_canteen",
+        json={
+            "name": "Test Canteen",
+            "address": "123 Test St",
+            "latitude": 123,
+            "longitude": 123,
+        },
+        headers={"Authorization": f"Bearer {merchant_token}"},
+    )
+
+    assert response.status_code == 200
+    canteen_id = response.json()["id"]
+
+    response = test_client.post(
         "/restaurants",
         json={
             "name": "Test Restaurant",
             "address": "123 Test St",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 123,
                 "lng": 123,
@@ -55,6 +70,7 @@ def test_restaurant(configuration_fixture: Configuration):
         json={
             "name": "Test Restaurant",
             "address": "456 Test St",
+            "canteen_id": canteen_id,
             "location": {
                 "lat": 456,
                 "lng": 456,
@@ -79,6 +95,13 @@ def test_restaurant(configuration_fixture: Configuration):
     assert response.json()["merchant_id"] == merchant_id
     assert response.json()["id"] == restaurant_id
     assert not response.json()["open"]
+
+    restaurants_in_canteen_response = test_client.get(
+        f"/canteens/{canteen_id}/restaurants",
+    )
+
+    assert restaurants_in_canteen_response.status_code == 200
+    assert restaurants_in_canteen_response.json() == [restaurant_id]
 
     file_path = os.path.join(os.getcwd(), "api", "tests", "assets", "test.jpg")
 
