@@ -41,7 +41,6 @@ from api.schemas.order import (
     SettledOrderUpdate,
 )
 from api.state import State
-
 import time
 
 
@@ -53,8 +52,8 @@ async def create_order(
     # check if the restaurant exists
     restaurant = await get_restaurant(state, payload.restaurant_id)
 
-    if not restaurant.open:
-        raise ConflictingError("restaurant is closed")
+    # if not restaurant.open:
+    #     raise ConflictingError("restaurant is closed")
 
     price_paid = Decimal(0)
     ordered_at = int(time.time())

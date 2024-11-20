@@ -23,8 +23,10 @@ from api.crud.canteen import (
 
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
+
 from api.schemas.restaurant import Restaurant
 from api.schemas.canteen import Canteen, CanteenBase
+
 
 from api.state import State
 
@@ -49,6 +51,7 @@ async def get_canteens_api(
         Canteen.model_validate(canteen)
         for canteen in await get_nearest_canteens(state, user_lat, user_long)
     ]
+
 
 
 @router.post(
