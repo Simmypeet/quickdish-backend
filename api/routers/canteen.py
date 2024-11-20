@@ -22,7 +22,7 @@ from api.crud.canteen import (
 # , get_nearest_restaurants
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
-from api.dependencies.id import get_merchant_id
+from api.dependencies.id import get_merchant_id, get_customer_id
 from api.schemas.restaurant import GetRestaurant
 from api.schemas.canteen import CanteenBase, GetCanteen
 
@@ -44,7 +44,7 @@ async def get_canteens_api(
     user_lat: float,
     user_long: float,
     state: State = Depends(get_state),
-    result: int = Depends(get_merchant_id),
+    result: int = Depends(get_customer_id)
 ) -> List[GetCanteen]:
     return await get_nearest_canteens(state, user_lat, user_long)
 

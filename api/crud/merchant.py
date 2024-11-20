@@ -11,6 +11,7 @@ from api.schemas.merchant import (
 
 import hashlib
 import datetime
+import logging
 
 
 async def register_merchant(
@@ -91,10 +92,26 @@ async def login_merchant(
     )
 
 
+# async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
+#     """Get a merchant by their ID."""
+
+#     try:
+#         return (
+#             state.session.query(Merchant)
+#             .filter(Merchant.id == merchant_id)
+#             .first()
+#         )
+#     catch(e): 
+#         loggin.error(e)
+    
 async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
     """Get a merchant by their ID."""
-    return (
-        state.session.query(Merchant)
-        .filter(Merchant.id == merchant_id)
-        .first()
-    )
+    try:
+        return (
+            state.session.query(Merchant)
+            .filter(Merchant.id == merchant_id)
+            .first()
+        )
+    except Exception as e:  # Corrected syntax
+        logging.error(f"Error fetching merchant with ID {merchant_id}: {e}")
+        return None  # Return None explicitly in case of an error
