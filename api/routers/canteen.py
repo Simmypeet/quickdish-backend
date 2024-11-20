@@ -11,20 +11,22 @@ from fastapi.responses import FileResponse
 
 from api.configuration import Configuration
 from api.crud.canteen import (
+    get_canteen_by_id,
     get_nearest_canteens,
     add_canteen,
+    get_restaurants_in_canteen,
     update_canteen_img,
     get_canteen_img,
     get_nearest_restaurants,
     get_canteen_by_restaurant_id,
 )
 
-# , get_nearest_restaurants
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
-from api.dependencies.id import get_merchant_id, get_customer_id
-from api.schemas.restaurant import GetRestaurant
-from api.schemas.canteen import CanteenBase, GetCanteen
+
+from api.schemas.restaurant import Restaurant
+from api.schemas.canteen import Canteen, CanteenBase
+
 
 from api.state import State
 
@@ -44,9 +46,12 @@ async def get_canteens_api(
     user_lat: float,
     user_long: float,
     state: State = Depends(get_state),
-    result: int = Depends(get_customer_id)
-) -> List[GetCanteen]:
-    return await get_nearest_canteens(state, user_lat, user_long)
+) -> List[Canteen]:
+    return [
+        Canteen.model_validate(canteen)
+        for canteen in await get_nearest_canteens(state, user_lat, user_long)
+    ]
+
 
 
 @router.post(
@@ -58,9 +63,63 @@ async def get_canteens_api(
 async def add_canteen_api(
     payload: CanteenBase,
     state: State = Depends(get_state),
-    result: int = Depends(get_merchant_id),
-) -> GetCanteen:
+) -> Canteen:
     return await add_canteen(state, payload)
+
+
+@router.get(
+    "/canteen/restaurants",
+    description="""
+        Get restaurants of the nearest canteen
+    """,
+)
+async def get_nearest_restaurants_api(
+    user_lat: float,
+    user_long: float,
+    state: State = Depends(get_state),
+) -> List[Restaurant]:
+    return [
+        Restaurant.model_validate(restaurant)
+        for restaurant in await get_nearest_restaurants(
+            state, user_lat, user_long
+        )
+    ]
+
+
+@router.get(
+    "/restaurants/{restaurant_id}",
+    description="""
+            Get canteen by restaurant id
+        """,
+)
+async def get_canteen_by_restaurant_id_api(
+    restaurant_id: int, state: State = Depends(get_state)
+) -> CanteenBase:
+    return await get_canteen_by_restaurant_id(state, restaurant_id)
+
+
+@router.get(
+    "/{canteen_id}",
+    description="""
+        Get the information of a canteen by id
+    """,
+)
+async def get_canteen_by_id_api(
+    canteen_id: int, state: State = Depends(get_state)
+) -> Canteen:
+    return await get_canteen_by_id(state, canteen_id)
+
+
+@router.get(
+    "/{canteen_id}/restaurants",
+    description="""
+        Get a list of restaurant ids in this canteen
+    """,
+)
+async def get_restaurants_in_canteen_api(
+    canteen_id: int, state: State = Depends(get_state)
+) -> List[int]:
+    return await get_restaurants_in_canteen(state, canteen_id)
 
 
 @router.put(
@@ -101,29 +160,3 @@ async def get_canteen_img_api(
             return None
         case image:
             return image
-
-
-@router.get(
-    "/restaurants/{restaurant_id}",
-    description="""
-            Get canteen by restaurant id
-        """,
-)
-async def get_canteen_by_restaurant_id_api(
-    restaurant_id: int, state: State = Depends(get_state)
-) -> CanteenBase:
-    return await get_canteen_by_restaurant_id(state, restaurant_id)
-
-
-@router.get(
-    "/canteen/restaurants",
-    description="""
-        Get restaurants of the nearest canteen
-    """,
-)
-async def get_nearest_restaurants_api(
-    user_lat: float,
-    user_long: float,
-    state: State = Depends(get_state),
-) -> List[GetRestaurant]:
-    return await get_nearest_restaurants(state, user_lat, user_long)
