@@ -6,6 +6,7 @@ from api.crud.merchant import get_merchant, login_merchant, register_merchant
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
+from api.errors import NotFoundError
 from api.schemas.authentication import AuthenticationResponse
 from api.schemas.merchant import (
     Merchant,
@@ -71,6 +72,9 @@ async def get_merchant_by_id_api(
     merchant_id: int,
     state: State = Depends(get_state),
 ) -> Merchant:
-    return await get_merchant(state, merchant_id)
+    result = await get_merchant(state, merchant_id)
 
+    if not result:
+        raise NotFoundError("merchant not found")
 
+    return result
