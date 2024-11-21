@@ -2,7 +2,12 @@ from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
 from api.configuration import Configuration
-from api.crud.merchant import get_merchant, login_merchant, register_merchant
+from api.crud.merchant import (
+    get_merchant,
+    get_restaurant_by_merchant_id,
+    login_merchant,
+    register_merchant,
+)
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
 from api.dependencies.id import get_merchant_id
@@ -13,6 +18,7 @@ from api.schemas.merchant import (
     MerchantLogin,
     MerchantRegister,
 )
+from api.schemas.restaurant import Restaurant
 from api.state import State
 
 
@@ -78,3 +84,15 @@ async def get_merchant_by_id_api(
         raise NotFoundError("merchant not found")
 
     return result
+
+
+@router.get(
+    "/{merchant_id}/restaurants",
+)
+async def get_restaurants_by_merchant_id_api(
+    merchant_id: int, state: State = Depends(get_state)
+) -> list[Restaurant]:
+    return [
+        Restaurant.model_validate(x)
+        for x in await get_restaurant_by_merchant_id(state, merchant_id)
+    ]

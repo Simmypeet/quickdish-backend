@@ -1,6 +1,7 @@
 from api.configuration import Configuration
 from api.errors import ConflictingError
 from api.errors.authentication import AuthenticationError
+from api.models.restaurant import Restaurant
 from api.schemas.authentication import AuthenticationResponse
 from api.state import State
 from api.models.merchant import Merchant
@@ -101,9 +102,10 @@ async def login_merchant(
 #             .filter(Merchant.id == merchant_id)
 #             .first()
 #         )
-#     catch(e): 
+#     catch(e):
 #         loggin.error(e)
-    
+
+
 async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
     """Get a merchant by their ID."""
     try:
@@ -115,3 +117,17 @@ async def get_merchant(state: State, merchant_id: int) -> Merchant | None:
     except Exception as e:  # Corrected syntax
         logging.error(f"Error fetching merchant with ID {merchant_id}: {e}")
         return None  # Return None explicitly in case of an error
+
+
+async def get_restaurant_by_merchant_id(
+    state: State, merchant_id: int
+) -> list[Restaurant]:
+    """Get a restaurant by its ID."""
+
+    restaurant = (
+        state.session.query(Restaurant)
+        .filter(Restaurant.merchant_id == merchant_id)
+        .all()
+    )
+
+    return restaurant

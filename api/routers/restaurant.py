@@ -19,8 +19,7 @@ from api.crud.restaurant import (
     upload_restaurant_image,
     get_restaurant_image,
     get_restaurant_reviews,
-    get_restaurant_by_merchant_id,
-    update_menu
+    update_menu,
 )
 from api.dependencies.configuration import get_configuration
 from api.dependencies.state import get_state
@@ -56,11 +55,8 @@ async def create_restaurant_api(
     state: State = Depends(get_state),
     result: int = Depends(get_merchant_id),
 ) -> int:
-    return await create_restaurant(
-        state,
-        result,
-        restaurant
-    )
+    return await create_restaurant(state, result, restaurant)
+
 
 @router.get(
     "/search",
@@ -72,16 +68,6 @@ async def search_restaurants_api(
     state: State = Depends(get_state),
 ) -> list[int]:
     return await search_restaurant(query, limit, state)
-
-@router.get(
-    "/{merchant_id}",
-    description="Get the restaurant details by merchant ID.",
-)
-async def get_restaurant_by_merchant_id_api(
-    merchant_id: int,
-    state: State = Depends(get_state),
-) -> list[Restaurant]:
-    return await get_restaurant_by_merchant_id(state, merchant_id)
 
 
 @router.get(
@@ -262,6 +248,7 @@ async def upload_menu_image_api(
 
     return "image updated"
 
+
 @router.put(
     "/menus/{menu_id}",
     description="""
@@ -276,11 +263,7 @@ async def update_menu_api(
     configuration: Configuration = Depends(get_configuration),
     merchant_id: int = Depends(get_merchant_id),
 ) -> str:
-    await update_menu(
-        state,
-        menu_id,
-        payload
-    )
+    await update_menu(state, menu_id, payload)
 
     return "menu updated"
 
