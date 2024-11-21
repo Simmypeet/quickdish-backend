@@ -222,19 +222,6 @@ async def delete_favorite_restaurant_ids_api(
     return "success"
 
 
-@router.get(
-    "/{customer_id}",
-    description="""
-        Get the public information of a user by their ID.
-    """,
-)
-async def get_customer_by_id_api(
-    customer_id: int,
-    state: State = Depends(get_state),
-) -> Customer:
-    return await get_customer(state, customer_id)
-
-
 # customer review
 @router.get(
     "/customer/reviews",
@@ -296,6 +283,19 @@ async def upload_banner_api(
     await upload_banner(configuration, image, customer_id, state)
 
     return "success"
+
+
+@router.get(
+    "/{customer_id}",
+    description="""
+        Get the public information of a user by their ID.
+    """,
+)
+async def get_customer_by_id_api(
+    customer_id: int,
+    state: State = Depends(get_state),
+) -> Customer:
+    return await get_customer(state, customer_id)
 
 
 @router.get(

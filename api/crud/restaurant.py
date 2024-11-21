@@ -218,11 +218,14 @@ async def get_menu(state: State, menu_id: int) -> Menu:
 
     return menu
 
+
 async def update_menu(state: State, menu_id: int, menu: MenuCreate) -> int:
-    existing_menu = state.session.query(Menu).filter(Menu.id == menu_id).first()
+    existing_menu = (
+        state.session.query(Menu).filter(Menu.id == menu_id).first()
+    )
     if not existing_menu:
         raise NotFoundError("menu not found")
-    
+
     existing_menu.name = menu.name
     existing_menu.description = menu.description
     existing_menu.price = menu.price
@@ -230,7 +233,6 @@ async def update_menu(state: State, menu_id: int, menu: MenuCreate) -> int:
 
     state.session.commit()
     return existing_menu
-
 
 
 async def get_restaurant_menus(
