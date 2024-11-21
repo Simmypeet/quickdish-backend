@@ -11,6 +11,7 @@ from api.schemas.restaurant import (
     CustomizationCreate,
     MenuCreate,
     RestaurantCreate,
+    Restaurant as RestaurantSchema,
 )
 from api.state import State
 from api.schemas.customer import CustomerReview as CustomerReviewSchema
@@ -62,6 +63,20 @@ async def get_restaurant(state: State, restaurant_id: int) -> Restaurant:
         state.session.query(Restaurant)
         .filter(Restaurant.id == restaurant_id)
         .first()
+    )
+
+    if not restaurant:
+        raise NotFoundError("restaurant not found")
+
+    return restaurant
+
+async def get_restaurant_by_merchant_id(state: State, merchant_id: int) -> list[RestaurantSchema]:
+    """Get a restaurant by its ID."""
+
+    restaurant = (
+        state.session.query(Restaurant)
+        .filter(Restaurant.merchant_id == merchant_id)
+        .all()
     )
 
     if not restaurant:

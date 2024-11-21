@@ -19,6 +19,7 @@ from api.crud.restaurant import (
     upload_restaurant_image,
     get_restaurant_image,
     get_restaurant_reviews,
+    get_restaurant_by_merchant_id,
     update_menu
 )
 from api.dependencies.configuration import get_configuration
@@ -58,9 +59,8 @@ async def create_restaurant_api(
     return await create_restaurant(
         state,
         result,
-        restaurant,
+        restaurant
     )
-
 
 @router.get(
     "/search",
@@ -72,6 +72,16 @@ async def search_restaurants_api(
     state: State = Depends(get_state),
 ) -> list[int]:
     return await search_restaurant(query, limit, state)
+
+@router.get(
+    "/{merchant_id}",
+    description="Get the restaurant details by merchant ID.",
+)
+async def get_restaurant_by_merchant_id_api(
+    merchant_id: int,
+    state: State = Depends(get_state),
+) -> list[Restaurant]:
+    return await get_restaurant_by_merchant_id(state, merchant_id)
 
 
 @router.get(
@@ -143,7 +153,6 @@ async def upload_restaurant_image_api(
         image,
         result,
     )
-
     return "image uploaded"
 
 
